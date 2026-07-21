@@ -54,28 +54,38 @@ def compute_affordability(state):
 
         char_result = entry.get("char_result")
         lc_result   = entry.get("lc_result")
+        ptype       = entry.get("type", "both")
+        eidolon     = entry.get("target_eidolon", 0)
+        si          = entry.get("target_superimposition", 1)
+
+        wants_char = ptype != "lc"
+        wants_lc   = ptype != "char"
 
         # Use global pity only for the first unresolved character
-        if char_result not in ("won", "lost", "skip") and first_pending_char:
+        if wants_char and char_result not in ("won", "lost", "skip") and first_pending_char:
             cp = global_char_pity
             cg = global_char_guaranteed
             first_pending_char = False
         else:
             cp, cg = 0, False
 
-        if lc_result not in ("won", "lost", "skip") and first_pending_lc:
+        if wants_lc and lc_result not in ("won", "lost", "skip") and first_pending_lc:
             lp = global_lc_pity
             lg = global_lc_guaranteed
             first_pending_lc = False
         else:
             lp, lg = 0, False
 
-        floors = compute_floors(luck, cp, cg, lp, lg)
+        floors = compute_floors(luck, cp, cg, lp, lg,
+                                 target_eidolon=eidolon, target_superimposition=si)
 
         # -------------------------
         # CHAR
         # -------------------------
-        if char_result == "skip":
+        if not wants_char:
+            pass
+
+        elif char_result == "skip":
             char_results.append(_make_result(name, "SKIPPED", 0, 0, 0, 0))
 
         elif char_result in ("won", "lost"):
@@ -103,6 +113,9 @@ def compute_affordability(state):
         # -------------------------
         # LC
         # -------------------------
+        if not wants_lc:
+            continue
+
         if lc_result == "skip":
             lc_results.append(_make_result(name, "SKIPPED", 0, 0, 0, 0))
             continue

@@ -3,7 +3,6 @@ from core.utils import parse_brackets
 
 def parse(raw_input: str):
 
-    # Use bracket-aware splitting
     parts, bracket_content = parse_brackets(raw_input)
 
     if not parts:
@@ -25,8 +24,6 @@ def parse(raw_input: str):
             return None
         return {"action": "open", "view": parts[1].lower()}
 
-    # debug file enable|disable
-    # debug terminal enable|disable
     if first == "debug":
         if len(parts) != 3:
             return None
@@ -49,7 +46,6 @@ def parse(raw_input: str):
         sub    = parts[1].lower()
         action = parts[2].lower()
 
-        # dashboard pulls set|add|subtract <sj> <sp>
         if sub == "pulls":
             if action not in ["set", "add", "subtract"] or len(parts) != 5:
                 return None
@@ -65,21 +61,13 @@ def parse(raw_input: str):
                 "payload":   {"sj": sj, "sp": sp}
             }
 
-        # dashboard future add <version> <sj|*> <sp|*> [chars|*] <notes>
-        # dashboard future set <version> <field> <value>
-        # dashboard future remove <version>
         if sub == "future":
             if action == "add":
                 version = parts[3] if len(parts) > 3 else None
                 sj      = parts[4] if len(parts) > 4 else "*"
                 sp      = parts[5] if len(parts) > 5 else "*"
-                # bracket_content holds characters if provided
-                chars   = bracket_content if bracket_content else (None if len(parts) <= 6 else None)
-                # notes: everything after sp (and after bracket if present)
-                if bracket_content:
-                    notes = " ".join(parts[6:]) if len(parts) > 6 else "N/A"
-                else:
-                    notes = " ".join(parts[6:]) if len(parts) > 6 else "N/A"
+                chars   = bracket_content if bracket_content else None
+                notes   = " ".join(parts[6:]) if len(parts) > 6 else "N/A"
                 return {
                     "action":    "add",
                     "domain":    "dashboard",
@@ -100,7 +88,6 @@ def parse(raw_input: str):
                 field   = parts[4].lower()
                 if field not in ["sj", "sp", "characters", "notes"]:
                     return None
-                # Characters field uses bracket content if provided
                 if field == "characters" and bracket_content:
                     value = bracket_content
                 elif len(parts) >= 6:
@@ -124,7 +111,6 @@ def parse(raw_input: str):
                     "payload":   {"version": parts[3]}
                 }
 
-        # dashboard luck set <field> <value>
         if sub == "luck":
             if action != "set" or len(parts) != 5:
                 return None
@@ -142,15 +128,12 @@ def parse(raw_input: str):
                 "payload":   {"field": field, "value": value}
             }
 
-        # dashboard pity set char|lc <count> [guaranteed|fresh]
-        # dashboard pity set char|lc guaranteed|fresh  (flag only)
         if sub == "pity":
             if action != "set" or len(parts) < 4:
                 return None
             banner = parts[3].lower()
             if banner not in ["char", "lc"]:
                 return None
-
             if len(parts) == 4:
                 return None
 
@@ -198,7 +181,6 @@ def parse(raw_input: str):
         if sub != "claimable":
             return None
 
-        # claimables claimable add <name> <sj> <sp> [abbr]
         if action == "add":
             if len(parts) not in [6, 7]:
                 return None
@@ -216,7 +198,6 @@ def parse(raw_input: str):
                 "payload":   {"name": name, "sj": sj, "sp": sp, "abbreviation": abbr}
             }
 
-        # claimables claimable set <name> <field> <value> [value2]
         if action == "set":
             if len(parts) < 6:
                 return None
@@ -256,16 +237,12 @@ def parse(raw_input: str):
                     "domain":    "claimables",
                     "subdomain": "claimable_field",
                     "payload": {
-                        "name":            name,
-                        "field":           "count",
-                        "count_completed": completed,
-                        "count_total":     total
+                        "name": name, "field": "count",
+                        "count_completed": completed, "count_total": total
                     }
                 }
-
             return None
 
-        # claimables claimable subtract <name> <sj> <sp>
         if action == "subtract":
             if len(parts) != 6:
                 return None
@@ -282,7 +259,6 @@ def parse(raw_input: str):
                 "payload":   {"name": name, "sj": sj, "sp": sp}
             }
 
-        # claimables claimable remove <name or abbr>
         if action == "remove":
             if len(parts) != 4:
                 return None
@@ -304,20 +280,24 @@ def parse(raw_input: str):
         sub    = parts[1].lower()
         action = parts[2].lower()
 
-        # priority char add <name> <order>
+        # priority char add <name> <order> [type]
+        # type: char | lc | both  (defaults to "both")
         if sub == "char" and action == "add":
-            if len(parts) != 5:
+            if len(parts) not in [5, 6]:
                 return None
             name = parts[3]
             try:
                 order = int(parts[4])
             except:
                 return None
+            ptype = parts[5].lower() if len(parts) == 6 else "both"
+            if ptype not in ["char", "lc", "both"]:
+                return None
             return {
                 "action":    "add",
                 "domain":    "priority",
                 "subdomain": "priority",
-                "payload":   {"name": name, "order": order}
+                "payload":   {"name": name, "order": order, "type": ptype}
             }
 
         # priority char remove <name>
@@ -339,24 +319,30 @@ def parse(raw_input: str):
             name  = parts[3]
             field = parts[4].lower()
 
-            # priority char set <name> result <won|lost|skip> [spent]
-            # priority lc set <name> result <won|lost|skip> [spent]
+            # priority char set <name> result <won|lost|skip> [spent] [lost_to]
+            # priority lc set <name> result <won|lost|skip> [spent] [lost_to]
             if field == "result":
                 result = parts[5].lower()
                 if result not in ["won", "lost", "skip"]:
                     return None
+
                 spent = None
                 if len(parts) >= 7:
                     try:
                         spent = int(parts[6])
                     except:
                         return None
+
+                lost_to = None
+                if len(parts) >= 8 and result == "lost":
+                    lost_to = parts[7]
+
                 subdomain = "priority_char_result" if sub == "char" else "priority_lc_result"
                 return {
                     "action":    "set",
                     "domain":    "priority",
                     "subdomain": subdomain,
-                    "payload":   {"name": name, "result": result, "spent": spent}
+                    "payload":   {"name": name, "result": result, "spent": spent, "lost_to": lost_to}
                 }
 
             # priority char set <name> order <n>
@@ -370,6 +356,48 @@ def parse(raw_input: str):
                     "domain":    "priority",
                     "subdomain": "priority_order",
                     "payload":   {"name": name, "order": order}
+                }
+
+            # priority char set <name> type <char|lc|both>
+            if sub == "char" and field == "type":
+                ptype = parts[5].lower()
+                if ptype not in ["char", "lc", "both"]:
+                    return None
+                return {
+                    "action":    "set",
+                    "domain":    "priority",
+                    "subdomain": "priority_type",
+                    "payload":   {"name": name, "type": ptype}
+                }
+
+            # priority char set <name> eidolon <0-6>
+            if sub == "char" and field == "eidolon":
+                try:
+                    eidolon = int(parts[5])
+                except:
+                    return None
+                if eidolon < 0 or eidolon > 6:
+                    return None
+                return {
+                    "action":    "set",
+                    "domain":    "priority",
+                    "subdomain": "priority_eidolon",
+                    "payload":   {"name": name, "eidolon": eidolon}
+                }
+
+            # priority char set <name> superimposition <1-5>
+            if sub == "char" and field == "superimposition":
+                try:
+                    superimposition = int(parts[5])
+                except:
+                    return None
+                if superimposition < 1 or superimposition > 5:
+                    return None
+                return {
+                    "action":    "set",
+                    "domain":    "priority",
+                    "subdomain": "priority_superimposition",
+                    "payload":   {"name": name, "superimposition": superimposition}
                 }
 
         return None

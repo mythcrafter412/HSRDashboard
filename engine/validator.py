@@ -166,6 +166,8 @@ def validate(command, state):
             new_order = int(payload["order"])
         except (ValueError, TypeError, KeyError):
             return False, "Order must be a number"
+        if payload.get("type") not in ["char", "lc", "both"]:
+            return False, "Type must be 'char', 'lc', or 'both'"
         for name, entry in state.get("priority", {}).items():
             if entry.get("order") == new_order:
                 return False, f"Order {new_order} is already used by '{name}'"
@@ -186,6 +188,35 @@ def validate(command, state):
         for name, entry in state.get("priority", {}).items():
             if name != payload["name"] and entry.get("order") == new_order:
                 return False, f"Order {new_order} is already used by '{name}'"
+        return True, "OK"
+
+    if action == "set" and subdomain == "priority_type":
+        if not payload.get("name"):
+            return False, "Missing name"
+        if payload.get("type") not in ["char", "lc", "both"]:
+            return False, "Type must be 'char', 'lc', or 'both'"
+        return True, "OK"
+
+    if action == "set" and subdomain == "priority_eidolon":
+        if not payload.get("name"):
+            return False, "Missing name"
+        try:
+            e = int(payload["eidolon"])
+        except (ValueError, TypeError, KeyError):
+            return False, "Eidolon must be a number"
+        if e < 0 or e > 6:
+            return False, "Eidolon must be 0-6"
+        return True, "OK"
+
+    if action == "set" and subdomain == "priority_superimposition":
+        if not payload.get("name"):
+            return False, "Missing name"
+        try:
+            s = int(payload["superimposition"])
+        except (ValueError, TypeError, KeyError):
+            return False, "Superimposition must be a number"
+        if s < 1 or s > 5:
+            return False, "Superimposition must be 1-5"
         return True, "OK"
 
     if action == "set" and subdomain in ("priority_char_result", "priority_lc_result"):

@@ -33,85 +33,69 @@ def handle_help(state, command):
 
     lines = [
         "",
-        f"{G}// COMMANDS — v0.1.1{R}",
+        f"{G}// COMMANDS — v0.2.0{R}",
         "=" * 60,
 
         sec("Navigation"),
         cmd("open <view>"),
-        ex("open dashboard  |  open claimables"),
+        ex("open dashboard  |  open claimables  |  open pull_history"),
 
         sec("Dashboard — Pulls"),
         cmd("dashboard pulls set <sj> <sp>         overwrite"),
         cmd("dashboard pulls add <sj> <sp>          add to existing"),
         cmd("dashboard pulls subtract <sj> <sp>     subtract from existing"),
         ex("dashboard pulls set 1058 210"),
-        ex("dashboard pulls add 160 1"),
-        ex("dashboard pulls subtract 0 5"),
 
         sec("Dashboard — Future Versions"),
         cmd("dashboard future add <version> <sj|*> <sp|*> [chars] <notes>"),
         note("* = unknown / omit.  chars in [brackets, comma separated]"),
         ex("dashboard future add v4.3 * 100 [Himeko Nova, Robin SP] N/A"),
-        ex("dashboard future add v4.4 800 20 * Half-patch estimate"),
         cmd("dashboard future set <version> <sj|sp|characters|notes> <value>"),
-        ex("dashboard future set v4.3 sp 90"),
-        ex("dashboard future set v4.3 characters [Himeko Nova, Aventurine SP]"),
-        ex("dashboard future set v4.3 notes Updated estimate"),
         cmd("dashboard future remove <version>"),
-        ex("dashboard future remove v4.3"),
 
         sec("Dashboard — Luck"),
         cmd("dashboard luck set <field> <value>"),
         note("fields: charpulls  lcpulls  winrate  lcrate  charstreak  lcstreak"),
         ex("dashboard luck set charpulls 63.1"),
-        ex("dashboard luck set lcpulls 57.4"),
-        ex("dashboard luck set winrate 71.4"),
-        ex("dashboard luck set lcrate 75.0"),
-        ex("dashboard luck set charstreak 2"),
-        ex("dashboard luck set lcstreak 0"),
 
         sec("Dashboard — Pity  (shared across all limited banners)"),
         cmd("dashboard pity set char <count> [guaranteed|fresh]"),
         cmd("dashboard pity set lc <count> [guaranteed|fresh]"),
-        cmd("dashboard pity set char guaranteed|fresh      flag only"),
-        cmd("dashboard pity set lc guaranteed|fresh        flag only"),
-        ex("dashboard pity set char 45"),
         ex("dashboard pity set char 45 guaranteed"),
-        ex("dashboard pity set lc guaranteed"),
 
         sec("Claimables"),
         cmd("claimables claimable add <name> <sj> <sp> [abbr]"),
-        ex("claimables claimable add Wispae_Park 500 0 wp"),
         cmd("claimables claimable set <name> <field> <value>"),
         note("fields:  sj <n>  |  sp <n>  |  name <newname>  |  abbr <newabbr>"),
         note("         count <completed> <total>  (achievements only)"),
-        ex("claimables claimable set Achievements sj 2010"),
-        ex("claimables claimable set Achievements count 1460 1748"),
-        ex("claimables claimable set ach abbr ac"),
         cmd("claimables claimable subtract <name> <sj> <sp>"),
-        note("subtracts from existing values (e.g. after spending)"),
-        ex("claimables claimable subtract du 160 0"),
         cmd("claimables claimable remove <name or abbreviation>"),
         note("Achievements, Divergent_Universe, Currency_Wars, Nameless_Honor"),
         note("are permanent and cannot be removed."),
-        ex("claimables claimable remove Wispae_Park"),
-        ex("claimables claimable remove wp"),
 
         sec("Priority"),
-        cmd("priority char add <name> <order>"),
-        ex("priority char add Nihilux 1"),
-        cmd("priority char set <name> result <won|lost|skip> [spent_sp]"),
-        note("auto-updates pity, luck stats, and win streak"),
-        ex("priority char set Nihilux result won 65"),
-        ex("priority char set Nihilux result lost 90"),
-        ex("priority char set Nihilux result skip"),
+        cmd("priority char add <name> <order> [char|lc|both]"),
+        note("type defaults to 'both' if omitted"),
+        ex("priority char add Nihilux 1 both"),
+        ex("priority char add Firefly 2 lc"),
+        cmd("priority char set <name> type <char|lc|both>"),
         cmd("priority char set <name> order <n>"),
-        ex("priority char set Nihilux order 2"),
+        cmd("priority char set <name> eidolon <0-6>"),
+        note("target Eidolon level — determines copies needed (E0=1 copy ... E6=7 copies)"),
+        ex("priority char set Nihilux eidolon 2"),
+        cmd("priority char set <name> superimposition <1-5>"),
+        note("target Superimposition level — determines LC copies needed (S1=1 ... S5=5)"),
+        ex("priority char set Nihilux superimposition 1"),
+        cmd("priority char set <name> result <won|lost|skip> [spent_sp] [lost_to]"),
+        note("auto-updates pity, luck stats, and win/loss streak"),
+        note("lost_to only applies when result is 'lost'"),
+        ex("priority char set Nihilux result won 65"),
+        ex("priority char set Nihilux result lost 90 Firefly"),
+        ex("priority char set Nihilux result skip"),
         cmd("priority char remove <name>"),
-        ex("priority char remove Nihilux"),
-        cmd("priority lc set <name> result <won|lost|skip> [spent_sp]"),
+        cmd("priority lc set <name> result <won|lost|skip> [spent_sp] [lost_to]"),
         ex("priority lc set Nihilux result won 43"),
-        ex("priority lc set Nihilux result skip"),
+        ex("priority lc set Nihilux result lost 60 Firefly"),
 
         sec("Debug"),
         cmd("debug file enable|disable      write trace to data/debug.log  (default: on)"),
@@ -381,7 +365,7 @@ def handle_add_priority(state, command):
     add_priority(state, payload)
     save_state(state)
     write_log("ADD_PRIORITY", payload)
-    print(f"[OK] Added to priority: {payload.get('name')}  order={payload.get('order')}")
+    print(f"[OK] Added to priority: {payload.get('name')}  order={payload.get('order')}  type={payload.get('type', 'both')}")
 
 @register(("remove", "priority"))
 def handle_remove_priority(state, command):
@@ -402,22 +386,54 @@ def handle_set_priority_order(state, command):
     write_log("SET_PRIORITY_ORDER", {"name": name, "order": order})
     print(f"[OK] {name} order → {order}")
 
+@register(("set", "priority_type"))
+def handle_set_priority_type(state, command):
+    payload = command.get("payload", {})
+    name    = payload.get("name")
+    ptype   = payload.get("type")
+    update_priority_field(state, name, "type", ptype)
+    save_state(state)
+    write_log("SET_PRIORITY_TYPE", {"name": name, "type": ptype})
+    print(f"[OK] {name} type → {ptype}")
+
+@register(("set", "priority_eidolon"))
+def handle_set_priority_eidolon(state, command):
+    payload = command.get("payload", {})
+    name    = payload.get("name")
+    eidolon = payload.get("eidolon")
+    update_priority_field(state, name, "target_eidolon", eidolon)
+    save_state(state)
+    write_log("SET_PRIORITY_EIDOLON", {"name": name, "eidolon": eidolon})
+    print(f"[OK] {name} target Eidolon → E{eidolon}  ({eidolon + 1} copies)")
+
+@register(("set", "priority_superimposition"))
+def handle_set_priority_superimposition(state, command):
+    payload         = command.get("payload", {})
+    name            = payload.get("name")
+    superimposition = payload.get("superimposition")
+    update_priority_field(state, name, "target_superimposition", superimposition)
+    save_state(state)
+    write_log("SET_PRIORITY_SUPERIMPOSITION", {"name": name, "superimposition": superimposition})
+    print(f"[OK] {name} target Superimposition → S{superimposition}  ({superimposition} copies)")
+
 @register(("set", "priority_char_result"))
 def handle_set_char_result(state, command):
     payload = command.get("payload", {})
     name    = payload.get("name")
     result  = payload.get("result")
     spent   = payload.get("spent")
+    lost_to = payload.get("lost_to")
 
     update_priority_field(state, name, "char_result", result)
     if spent is not None:
         update_priority_field(state, name, "char_spent", spent)
 
-    record_char_result(state, result, spent)
+    record_char_result(state, result, spent, lost_to, name)
     save_state(state)
     write_log("SET_PRIORITY_CHAR_RESULT", payload)
     spent_str = f"  spent: {spent} SP" if spent else ""
-    print(f"[OK] {name} char: {result}{spent_str}")
+    lost_str  = f"  lost to: {lost_to}" if lost_to else ""
+    print(f"[OK] {name} char: {result}{spent_str}{lost_str}")
 
 @register(("set", "priority_lc_result"))
 def handle_set_lc_result(state, command):
@@ -425,13 +441,15 @@ def handle_set_lc_result(state, command):
     name    = payload.get("name")
     result  = payload.get("result")
     spent   = payload.get("spent")
+    lost_to = payload.get("lost_to")
 
     update_priority_field(state, name, "lc_result", result)
     if spent is not None:
         update_priority_field(state, name, "lc_spent", spent)
 
-    record_lc_result(state, result, spent)
+    record_lc_result(state, result, spent, lost_to, name)
     save_state(state)
     write_log("SET_PRIORITY_LC_RESULT", payload)
     spent_str = f"  spent: {spent} SP" if spent else ""
-    print(f"[OK] {name} LC: {result}{spent_str}")
+    lost_str  = f"  lost to: {lost_to}" if lost_to else ""
+    print(f"[OK] {name} LC: {result}{spent_str}{lost_str}")

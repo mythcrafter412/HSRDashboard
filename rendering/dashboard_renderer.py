@@ -97,24 +97,29 @@ def render_dashboard(state):
     lines.append("// Character Pull Priority")
     lines.append("-" * 44)
 
-    if not sorted_priority:
+    char_entries = [(n, e) for n, e in sorted_priority if e.get("type", "both") != "lc"]
+
+    if not char_entries:
         lines.append("No characters in priority list.")
     else:
         total_char_high = 0
         total_char_low  = 0
         first_pending   = True
 
-        for name, entry in sorted_priority:
-            order  = entry.get("order", "?")
-            result = entry.get("char_result")
-            spent  = entry.get("char_spent")
+        for name, entry in char_entries:
+            order   = entry.get("order", "?")
+            result  = entry.get("char_result")
+            spent   = entry.get("char_spent")
+            eidolon = entry.get("target_eidolon", 0)
+            si      = entry.get("target_superimposition", 1)
 
             if result not in ("won", "lost", "skip") and first_pending:
-                floors = compute_floors(luck, global_cp, global_cg, global_lp, global_lg)
+                floors = compute_floors(luck, global_cp, global_cg, global_lp, global_lg,
+                                         target_eidolon=eidolon, target_superimposition=si)
                 pity_str = f"pity: {global_cp}/90  {global_cg and 'GUARANTEED' or 'fresh'}"
                 first_pending = False
             else:
-                floors = compute_floors(luck)
+                floors = compute_floors(luck, target_eidolon=eidolon, target_superimposition=si)
                 pity_str = "pity: 0/90  fresh"
 
             if result in ("won", "lost"):
@@ -140,25 +145,29 @@ def render_dashboard(state):
     lines.append("// LC Pull Priority")
     lines.append("-" * 44)
 
-    if not sorted_priority:
+    lc_entries = [(n, e) for n, e in sorted_priority if e.get("type", "both") != "char"]
+
+    if not lc_entries:
         lines.append("No characters in priority list.")
     else:
         total_lc_high = 0
         total_lc_low  = 0
         first_pending = True
 
-        for name, entry in sorted_priority:
+        for name, entry in lc_entries:
             order  = entry.get("order", "?")
             result = entry.get("lc_result")
             spent  = entry.get("lc_spent")
             char_r = entry.get("char_result")
+            si     = entry.get("target_superimposition", 1)
 
             if result not in ("won", "lost", "skip") and first_pending:
-                floors = compute_floors(luck, global_cp, global_cg, global_lp, global_lg)
+                floors = compute_floors(luck, global_cp, global_cg, global_lp, global_lg,
+                                         target_superimposition=si)
                 pity_str = f"pity: {global_lp}/80  {global_lg and 'GUARANTEED' or 'fresh'}"
                 first_pending = False
             else:
-                floors = compute_floors(luck)
+                floors = compute_floors(luck, target_superimposition=si)
                 pity_str = "pity: 0/80  fresh"
 
             lc_label = display(name) + " LC"

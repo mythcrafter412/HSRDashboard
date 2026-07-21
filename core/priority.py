@@ -16,11 +16,14 @@ def add_priority(state, payload):
     order = int(payload.get("order", len(state["priority"]) + 1))
 
     state["priority"][name] = {
-        "order":       order,
-        "char_result": None,
-        "lc_result":   None,
-        "char_spent":  None,
-        "lc_spent":    None,
+        "order":                  order,
+        "type":                   payload.get("type", "both"),   # char | lc | both
+        "target_eidolon":         payload.get("target_eidolon", 0),        # 0-6
+        "target_superimposition": payload.get("target_superimposition", 1), # 1-5
+        "char_result":            None,
+        "lc_result":              None,
+        "char_spent":             None,
+        "lc_spent":               None,
     }
 
     return state
@@ -53,96 +56,137 @@ def get_sorted_priority(state):
 
 def update_luck_from_history(state):
     """
-    Recompute avg_pulls_char, avg_pulls_lc, win_rate, lc_win_rate
-    from pull_history. Called automatically when a result is recorded.
+    Recompute avg_pulls_char, avg_pulls_lc, win_rate, lc_win_rate from pull_history.
+
+    Avg pulls = flat average of pulls-to-result (the "spent" field) across every
+    recorded event — win, loss, or guarantee-completion each contribute their own
+    value independently; a loss+guarantee pair is NOT combined into one figure.
+
+    Win rate = clean wins / (clean wins + loss-then-guarantee cycles).
+    Here a loss+guarantee pair IS counted as a single cycle (denominator-only
+    increase on the guarantee win) — this is a separate concern from the average.
     """
     history = state.get("pull_history", {})
     luck    = state.get("luck", {})
 
-    char_pulls = history.get("char", [])
-    lc_pulls   = history.get("lc",   [])
+    for kind, avg_key, rate_key in [("char", "avg_pulls_char", "win_rate"),
+                                     ("lc",   "avg_pulls_lc",   "lc_win_rate")]:
 
-    if char_pulls:
-        spent_list = [p["spent"] for p in char_pulls if p.get("spent") is not None]
-        wins       = sum(1 for p in char_pulls if p.get("result") == "won")
+        entries = history.get(kind, [])
+        if not entries:
+            continue
 
-        if spent_list:
-            luck["avg_pulls_char"] = round(sum(spent_list) / len(spent_list), 1)
-        if char_pulls:
-            luck["win_rate"] = round(wins / len(char_pulls) * 100, 1)
+        spents = [e["spent"] for e in entries if e.get("spent") is not None]
+        if spents:
+            luck[avg_key] = round(sum(spents) / len(spents), 1)
 
-    if lc_pulls:
-        spent_list = [p["spent"] for p in lc_pulls if p.get("spent") is not None]
-        wins       = sum(1 for p in lc_pulls if p.get("result") == "won")
+        clean_wins   = 0
+        total_cycles = 0
 
-        if spent_list:
-            luck["avg_pulls_lc"] = round(sum(spent_list) / len(spent_list), 1)
-        if lc_pulls:
-            luck["lc_win_rate"] = round(wins / len(lc_pulls) * 100, 1)
+        for entry in entries:
+            if entry["result"] == "won" and not entry.get("via_guarantee"):
+                clean_wins   += 1
+                total_cycles += 1
+            elif entry.get("via_guarantee"):
+                total_cycles += 1
+            # "lost" entries not yet linked to a guarantee are in-progress —
+            # not counted toward win rate until the guarantee resolves them
+
+        if total_cycles:
+            luck[rate_key] = round(clean_wins / total_cycles * 100, 1)
 
     state["luck"] = luck
     return state
 
 
-def record_char_result(state, result, spent):
+def _record_result(state, kind, result, spent, lost_to=None, name=None):
     """
-    Record a character pull result.
-    Updates: pull_history, pity, luck (auto), streak.
+    Shared logic for recording a char or LC pull result.
+    kind: "char" or "lc"
     """
+    hard_pity  = CHAR_HARD_PITY if kind == "char" else LC_HARD_PITY
+    streak_key = "char_streak" if kind == "char" else "lc_streak"
+
     pity    = state.setdefault("pity", {})
-    char_p  = pity.setdefault("char", {"count": 0, "guaranteed": False})
+    p       = pity.setdefault(kind, {"count": 0, "guaranteed": False})
     luck    = state.setdefault("luck", {})
     history = state.setdefault("pull_history", {"char": [], "lc": []})
 
-    was_guaranteed = char_p.get("guaranteed", False)
+    was_guaranteed = p.get("guaranteed", False)
+    pity_at_event  = p.get("count", 0)
 
-    # Record in history
-    if spent is not None:
-        history["char"].append({"spent": spent, "result": result})
-        update_luck_from_history(state)
-
-    # Update pity and streak
-    if result == "won":
-        char_p["count"]      = 0
-        char_p["guaranteed"] = False
-        # Only increment streak on a genuine fresh 50/50 win
-        if not was_guaranteed:
-            luck["char_streak"] = luck.get("char_streak", 0) + 1
-
-    elif result == "lost":
-        char_p["count"]      = 0
-        char_p["guaranteed"] = True
-        luck["char_streak"]  = 0
-
-    # skip: no pity or streak change
-
-
-def record_lc_result(state, result, spent):
-    """
-    Record a light cone pull result.
-    Updates: pull_history, pity, luck (auto), streak.
-    """
-    pity    = state.setdefault("pity", {})
-    lc_p    = pity.setdefault("lc", {"count": 0, "guaranteed": False})
-    luck    = state.setdefault("luck", {})
-    history = state.setdefault("pull_history", {"char": [], "lc": []})
-
-    was_guaranteed = lc_p.get("guaranteed", False)
-
-    if spent is not None:
-        history["lc"].append({"spent": spent, "result": result})
-        update_luck_from_history(state)
+    if result == "skip":
+        return  # no pity, streak, or history change
 
     if result == "won":
-        lc_p["count"]      = 0
-        lc_p["guaranteed"] = False
-        if not was_guaranteed:
-            luck["lc_streak"] = luck.get("lc_streak", 0) + 1
+        p["count"]      = 0
+        p["guaranteed"] = False
+
+        if was_guaranteed:
+            # This win COMPLETES a loss->guarantee cycle.
+            # Find the most recent unlinked "lost" entry to link to.
+            entries = history[kind]
+            linked  = False
+            for entry in reversed(entries):
+                if entry["result"] == "lost" and not entry.get("linked"):
+                    entry["linked"]  = True
+                    prior_spent      = entry.get("spent")
+                    total_spent      = (None if (prior_spent is None or spent is None)
+                                        else prior_spent + spent)
+                    history[kind].append({
+                        "result":        "won",
+                        "pity":          pity_at_event,
+                        "spent":         spent,
+                        "name":          name,
+                        "via_guarantee": True,
+                        "total_spent":   total_spent,
+                    })
+                    linked = True
+                    break
+            if not linked:
+                # Fallback: no matching loss found, log as guarantee anyway
+                history[kind].append({
+                    "result": "won", "pity": pity_at_event,
+                    "spent": spent, "name": name, "via_guarantee": True,
+                    "total_spent": spent
+                })
+
+            # Loss streak +1 (stacks), win streak resets
+            luck[f"loss_{streak_key}"] = luck.get(f"loss_{streak_key}", 0) + 1
+            luck[streak_key] = 0
+
+        else:
+            # Clean win
+            history[kind].append({
+                "result": "won", "pity": pity_at_event, "spent": spent, "name": name
+            })
+            luck[streak_key] = luck.get(streak_key, 0) + 1
+            luck[f"loss_{streak_key}"] = 0
+
+        update_luck_from_history(state)
 
     elif result == "lost":
-        lc_p["count"]      = 0
-        lc_p["guaranteed"] = True
-        luck["lc_streak"]  = 0
+        p["count"]      = 0
+        p["guaranteed"] = True
+
+        history[kind].append({
+            "result":  "lost",
+            "pity":    pity_at_event,
+            "spent":   spent,
+            "name":    name,
+            "lost_to": lost_to,
+            "linked":  False,
+        })
+        # Streak isn't touched here — it only resolves once the guarantee
+        # pull comes in and closes the cycle (see "won" branch above).
+
+
+def record_char_result(state, result, spent, lost_to=None, name=None):
+    _record_result(state, "char", result, spent, lost_to, name)
+
+
+def record_lc_result(state, result, spent, lost_to=None, name=None):
+    _record_result(state, "lc", result, spent, lost_to, name)
 
 
 # -----------------------------
@@ -150,17 +194,11 @@ def record_lc_result(state, result, spent):
 # -----------------------------
 
 def compute_floors(luck, char_pity=0, char_guaranteed=False,
-                   lc_pity=0, lc_guaranteed=False):
+                   lc_pity=0, lc_guaranteed=False,
+                   target_eidolon=0, target_superimposition=1):
     """
-    Returns high-floor and low-floor SP cost for char and LC.
-
-    High floor = hard-pity worst case:
-      Char fresh:      (90 - pity) + 90
-      Char guaranteed: (90 - pity)
-      LC fresh:        (80 - pity) + 80
-      LC guaranteed:   (80 - pity)
-
-    Low floor = blended expected case using luck stats.
+    Returns high-floor and low-floor SP cost for char and LC,
+    scaled by target Eidolon (copies = E+1) and Superimposition (copies = S).
     """
 
     avg_char = luck.get("avg_pulls_char", 62)
@@ -168,12 +206,19 @@ def compute_floors(luck, char_pity=0, char_guaranteed=False,
     wr       = luck.get("win_rate",       55) / 100.0
     lc_wr    = luck.get("lc_win_rate",    75) / 100.0
 
+    char_copies = target_eidolon + 1        # E0=1 copy ... E6=7 copies
+    lc_copies   = max(1, target_superimposition)  # S1=1 copy ... S5=5 copies
+
     char_remaining = CHAR_HARD_PITY - char_pity
     lc_remaining   = LC_HARD_PITY   - lc_pity
 
-    # HIGH FLOOR
-    char_high = char_remaining if char_guaranteed else char_remaining + CHAR_HARD_PITY
-    lc_high   = lc_remaining   if lc_guaranteed   else lc_remaining   + LC_HARD_PITY
+    # HIGH FLOOR (first copy only — pity resets after)
+    char_high_first = char_remaining if char_guaranteed else char_remaining + CHAR_HARD_PITY
+    lc_high_first   = lc_remaining   if lc_guaranteed   else lc_remaining   + LC_HARD_PITY
+
+    # Subsequent copies always start fresh (no pity carryover assumed)
+    char_high = char_high_first + (char_copies - 1) * (CHAR_HARD_PITY * 2)
+    lc_high   = lc_high_first   + (lc_copies   - 1) * (LC_HARD_PITY * 2)
 
     # LOW FLOOR
     pf_char = char_remaining / CHAR_HARD_PITY
@@ -183,14 +228,17 @@ def compute_floors(luck, char_pity=0, char_guaranteed=False,
     eff_lc   = max(1, round(avg_lc   * pf_lc))
 
     if char_guaranteed:
-        char_low = eff_char
+        char_low_first = eff_char
     else:
-        char_low = round(wr * eff_char + (1 - wr) * 2 * eff_char)
+        char_low_first = round(wr * eff_char + (1 - wr) * 2 * eff_char)
 
     if lc_guaranteed:
-        lc_low = eff_lc
+        lc_low_first = eff_lc
     else:
-        lc_low = round(lc_wr * eff_lc + (1 - lc_wr) * 2 * eff_lc)
+        lc_low_first = round(lc_wr * eff_lc + (1 - lc_wr) * 2 * eff_lc)
+
+    char_low = char_low_first + (char_copies - 1) * round(wr * avg_char + (1 - wr) * 2 * avg_char)
+    lc_low   = lc_low_first   + (lc_copies   - 1) * round(lc_wr * avg_lc + (1 - lc_wr) * 2 * avg_lc)
 
     return {
         "char_high": char_high,
