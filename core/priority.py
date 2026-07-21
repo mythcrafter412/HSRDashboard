@@ -144,7 +144,6 @@ def _record_result(state, kind, result, spent, lost_to=None, name=None):
     Shared logic for recording a char or LC pull result.
     kind: "char" or "lc"
     """
-    hard_pity  = CHAR_HARD_PITY if kind == "char" else LC_HARD_PITY
     streak_key = "char_streak" if kind == "char" else "lc_streak"
 
     pity    = state.setdefault("pity", {})
