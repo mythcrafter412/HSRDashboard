@@ -1,0 +1,9 @@
+# Personal save data — never tracked, never pushed, never overwritten by pulls
+data/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local staging folder for updater
+staging/
