@@ -1,12 +1,15 @@
 import json
 import os
 
+from core.migrate import CURRENT_SCHEMA_VERSION, check_and_migrate
+
 BASE_DIR   = os.path.dirname(os.path.dirname(__file__))
 STATE_FILE = os.path.join(BASE_DIR, "data", "state.json")
 
 
 def create_initial_state():
     return {
+        "_meta": {"schema_version": CURRENT_SCHEMA_VERSION},
         "pulls": {"sj": 0, "sp": 0},
         "claimables": {},
         "future_versions": {},
@@ -42,7 +45,14 @@ def load_state():
         return state
 
     with open(STATE_FILE, "r") as f:
-        return json.load(f)
+        state = json.load(f)
+
+    state, applied = check_and_migrate(state)
+    if applied:
+        print(f"[MIGRATE] Applied schema migration(s): {', '.join(str(v) for v in applied)}")
+    save_state(state)  # persist the schema_version stamp even when no migration ran
+
+    return state
 
 
 def save_state(state):

@@ -3,6 +3,7 @@ from core.priority import (add_priority, remove_priority, update_priority_field,
                             set_priority_order, record_char_result, record_lc_result)
 from core.state import save_state
 from core.log import write_log
+from core.utils import get_version
 from rendering.registry import get_view
 from engine.debug import trace
 
@@ -33,7 +34,7 @@ def handle_help(state, command):
 
     lines = [
         "",
-        f"{G}// COMMANDS — v0.2.0{R}",
+        f"{G}// COMMANDS — v{get_version()}{R}",
         "=" * 60,
 
         sec("Navigation"),

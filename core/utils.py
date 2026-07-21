@@ -1,4 +1,15 @@
+import os
 import re
+
+VERSION_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "VERSION")
+
+
+def get_version():
+    try:
+        with open(VERSION_FILE, "r") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return "unknown"
 
 
 def display(name):

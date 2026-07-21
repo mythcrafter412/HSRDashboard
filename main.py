@@ -1,4 +1,5 @@
 from core.state import load_state
+from core.utils import get_version
 from engine.executor import execute
 from engine.command_parser import parse
 from engine.loader import load_renderers
@@ -9,7 +10,7 @@ def main():
 
     state = load_state()
 
-    print("// HSR PULL PLANNER v0.1.1 —  type 'help' for commands")
+    print(f"// HSR PULL PLANNER v{get_version()} —  type 'help' for commands")
 
     while True:
         user_input = input("> ")
