@@ -166,11 +166,10 @@ def validate(command, state):
             new_order = int(payload["order"])
         except (ValueError, TypeError, KeyError):
             return False, "Order must be a number"
+        if new_order < 1:
+            return False, "Order must be 1 or greater"
         if payload.get("type") not in ["char", "lc", "both"]:
             return False, "Type must be 'char', 'lc', or 'both'"
-        for name, entry in state.get("priority", {}).items():
-            if entry.get("order") == new_order:
-                return False, f"Order {new_order} is already used by '{name}'"
         return True, "OK"
 
     if action == "remove" and subdomain == "priority":
@@ -181,13 +180,14 @@ def validate(command, state):
     if action == "set" and subdomain == "priority_order":
         if not payload.get("name"):
             return False, "Missing name"
+        if payload["name"] not in state.get("priority", {}):
+            return False, f"'{payload['name']}' is not in the priority list"
         try:
             new_order = int(payload["order"])
         except (ValueError, TypeError, KeyError):
             return False, "Order must be a number"
-        for name, entry in state.get("priority", {}).items():
-            if name != payload["name"] and entry.get("order") == new_order:
-                return False, f"Order {new_order} is already used by '{name}'"
+        if new_order < 1:
+            return False, "Order must be 1 or greater"
         return True, "OK"
 
     if action == "set" and subdomain == "priority_type":

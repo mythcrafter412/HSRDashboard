@@ -1,6 +1,6 @@
 from core.claimables import add_claimable, remove_claimable, set_claimable, resolve_name
 from core.priority import (add_priority, remove_priority, update_priority_field,
-                            record_char_result, record_lc_result)
+                            set_priority_order, record_char_result, record_lc_result)
 from core.state import save_state
 from core.log import write_log
 from rendering.registry import get_view
@@ -76,10 +76,12 @@ def handle_help(state, command):
         sec("Priority"),
         cmd("priority char add <name> <order> [char|lc|both]"),
         note("type defaults to 'both' if omitted"),
+        note("inserting at an occupied order shifts existing entries down"),
         ex("priority char add Nihilux 1 both"),
         ex("priority char add Firefly 2 lc"),
         cmd("priority char set <name> type <char|lc|both>"),
         cmd("priority char set <name> order <n>"),
+        note("moving to an occupied order shifts everything between old/new position"),
         cmd("priority char set <name> eidolon <0-6>"),
         note("target Eidolon level — determines copies needed (E0=1 copy ... E6=7 copies)"),
         ex("priority char set Nihilux eidolon 2"),
@@ -362,10 +364,12 @@ def handle_remove_claimable(state, command):
 @register(("add", "priority"))
 def handle_add_priority(state, command):
     payload = command.get("payload", {})
+    name    = payload.get("name")
     add_priority(state, payload)
     save_state(state)
     write_log("ADD_PRIORITY", payload)
-    print(f"[OK] Added to priority: {payload.get('name')}  order={payload.get('order')}  type={payload.get('type', 'both')}")
+    actual_order = state["priority"][name]["order"]
+    print(f"[OK] Added to priority: {name}  order={actual_order}  type={payload.get('type', 'both')}")
 
 @register(("remove", "priority"))
 def handle_remove_priority(state, command):
@@ -381,10 +385,11 @@ def handle_set_priority_order(state, command):
     payload = command.get("payload", {})
     name    = payload.get("name")
     order   = payload.get("order")
-    update_priority_field(state, name, "order", order)
+    set_priority_order(state, name, order)
     save_state(state)
     write_log("SET_PRIORITY_ORDER", {"name": name, "order": order})
-    print(f"[OK] {name} order → {order}")
+    actual_order = state["priority"][name]["order"]
+    print(f"[OK] {name} order → {actual_order}")
 
 @register(("set", "priority_type"))
 def handle_set_priority_type(state, command):

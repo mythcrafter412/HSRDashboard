@@ -26,6 +26,8 @@ def add_priority(state, payload):
         "lc_spent":               None,
     }
 
+    reorder_priority(state, name, order)
+
     return state
 
 
@@ -33,6 +35,7 @@ def remove_priority(state, name):
 
     if name in state.get("priority", {}):
         del state["priority"][name]
+        _renumber(state)
 
     return state
 
@@ -45,9 +48,42 @@ def update_priority_field(state, name, field, value):
     return state
 
 
+def set_priority_order(state, name, new_order):
+    reorder_priority(state, name, new_order)
+    return state
+
+
 def get_sorted_priority(state):
     priority = state.get("priority", {})
     return sorted(priority.items(), key=lambda x: x[1].get("order", 99))
+
+
+def _renumber(state):
+    for i, (name, entry) in enumerate(get_sorted_priority(state), start=1):
+        entry["order"] = i
+    return state
+
+
+def reorder_priority(state, name, new_order):
+    """
+    Move (or place a newly-added) `name` into position `new_order` (1-indexed),
+    shifting every other entry to make room, then renumber everyone
+    sequentially so order values never collide or leave gaps.
+    """
+    priority = state.get("priority", {})
+    if name not in priority:
+        return state
+
+    entry  = priority[name]
+    others = [(n, e) for n, e in get_sorted_priority(state) if n != name]
+
+    new_order = max(1, min(new_order, len(others) + 1))
+    others.insert(new_order - 1, (name, entry))
+
+    for i, (n, e) in enumerate(others, start=1):
+        e["order"] = i
+
+    return state
 
 
 # -----------------------------
