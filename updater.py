@@ -14,8 +14,18 @@ USER_AGENT = "HSRDashboard-Updater"
 
 
 def _install_root():
-    appdata = os.environ.get("APPDATA") or os.path.expanduser("~")
-    return os.path.join(appdata, "HSRDashboard")
+    """
+    Portable install: app\\ and data\\ live next to this exe (or, when run
+    as a plain script, next to updater.py) wherever the user put it — not
+    tucked away in %APPDATA%. Lets the whole install be moved as one folder.
+
+    getattr(sys, "frozen", False) and sys.executable are how PyInstaller
+    reports "I'm a compiled exe" and its real path — this needs no extra
+    dependency, both are stdlib/interpreter-provided.
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 def _app_dir():
