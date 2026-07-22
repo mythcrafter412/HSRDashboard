@@ -1,8 +1,9 @@
 import os
 from datetime import datetime
 
-BASE_DIR   = os.path.dirname(os.path.dirname(__file__))
-DEBUG_FILE = os.path.join(BASE_DIR, "data", "debug.log")
+from core.utils import get_data_dir
+
+DEBUG_FILE = os.path.join(get_data_dir(), "debug.log")
 
 
 def trace(state, layer, message):

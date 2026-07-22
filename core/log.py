@@ -2,7 +2,9 @@ import json
 import os
 from datetime import datetime
 
-LOG_FILE = "data/history_log.json"
+from core.utils import get_data_dir
+
+LOG_FILE = os.path.join(get_data_dir(), "history_log.json")
 
 
 def load_log():

@@ -2,9 +2,9 @@ import json
 import os
 
 from core.migrate import CURRENT_SCHEMA_VERSION, check_and_migrate
+from core.utils import get_data_dir
 
-BASE_DIR   = os.path.dirname(os.path.dirname(__file__))
-STATE_FILE = os.path.join(BASE_DIR, "data", "state.json")
+STATE_FILE = os.path.join(get_data_dir(), "state.json")
 
 
 def create_initial_state():

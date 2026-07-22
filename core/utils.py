@@ -12,6 +12,23 @@ def get_version():
         return "unknown"
 
 
+def get_data_dir():
+    """
+    Resolve the directory for state.json/history_log.json/debug.log.
+
+    updater.py sets HSR_DATA_DIR before launching the app, pointing at
+    %APPDATA%\\HSRDashboard\\data — a sibling of app\\, not nested inside
+    it, so save data survives every update (app\\ gets wiped and replaced
+    each time). Falls back to a data\\ folder next to this repo's root for
+    standalone `python main.py` use, where there's no app\\/data\\ split.
+    """
+    override = os.environ.get("HSR_DATA_DIR")
+    if override:
+        return override
+    repo_root = os.path.dirname(os.path.dirname(__file__))
+    return os.path.join(repo_root, "data")
+
+
 def display(name):
     """Convert stored name format to display format: Yao_Guang → Yao Guang"""
     return str(name).replace("_", " ")
