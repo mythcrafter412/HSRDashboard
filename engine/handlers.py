@@ -34,32 +34,32 @@ def handle_help(state, command):
 
     lines = [
         "",
-        f"{G}// COMMANDS — v{get_version()}{R}",
+        f"{G}// COMMANDS -- v{get_version()}{R}",
         "=" * 60,
 
         sec("Navigation"),
         cmd("open <view>"),
         ex("open dashboard  |  open claimables  |  open pull_history"),
 
-        sec("Dashboard — Pulls"),
+        sec("Dashboard -- Pulls"),
         cmd("dashboard pulls set <sj> <sp>         overwrite"),
         cmd("dashboard pulls add <sj> <sp>          add to existing"),
         cmd("dashboard pulls subtract <sj> <sp>     subtract from existing"),
         ex("dashboard pulls set 1058 210"),
 
-        sec("Dashboard — Future Versions"),
+        sec("Dashboard -- Future Versions"),
         cmd("dashboard future add <version> <sj|*> <sp|*> [chars] <notes>"),
         note("* = unknown / omit.  chars in [brackets, comma separated]"),
         ex("dashboard future add v4.3 * 100 [Himeko Nova, Robin SP] N/A"),
         cmd("dashboard future set <version> <sj|sp|characters|notes> <value>"),
         cmd("dashboard future remove <version>"),
 
-        sec("Dashboard — Luck"),
+        sec("Dashboard -- Luck"),
         cmd("dashboard luck set <field> <value>"),
         note("fields: charpulls  lcpulls  winrate  lcrate  charstreak  lcstreak"),
         ex("dashboard luck set charpulls 63.1"),
 
-        sec("Dashboard — Pity  (shared across all limited banners)"),
+        sec("Dashboard -- Pity  (shared across all limited banners)"),
         cmd("dashboard pity set char <count> [guaranteed|fresh]"),
         cmd("dashboard pity set lc <count> [guaranteed|fresh]"),
         ex("dashboard pity set char 45 guaranteed"),
@@ -84,17 +84,17 @@ def handle_help(state, command):
         cmd("priority char set <name> order <n>"),
         note("moving to an occupied order shifts everything between old/new position"),
         cmd("priority char set <name> eidolon <0-6>"),
-        note("target Eidolon level — determines copies needed (E0=1 copy ... E6=7 copies)"),
+        note("target Eidolon level -- determines copies needed (E0=1 copy ... E6=7 copies)"),
         ex("priority char set Nihilux eidolon 2"),
         cmd("priority char set <name> superimposition <1-5>"),
-        note("target Superimposition level — determines LC copies needed (S1=1 ... S5=5)"),
+        note("target Superimposition level -- determines LC copies needed (S1=1 ... S5=5)"),
         ex("priority char set Nihilux superimposition 1"),
         cmd("priority char set <name> result <won|lost|skip> [spent_sp] [lost_to]"),
         note("auto-updates pity, luck stats, and win/loss streak"),
         note("lost_to only applies when result is 'lost'"),
         note("skip with a spent_sp value logs partial pulls abandoned without a"),
-        note("  5-star (doesn't touch global pity/guaranteed — track those via"),
-        note("  'dashboard pity' — and never counts toward the avg-pulls stat)"),
+        note("  5-star (doesn't touch global pity/guaranteed -- track those via"),
+        note("  'dashboard pity' -- and never counts toward the avg-pulls stat)"),
         ex("priority char set Nihilux result won 65"),
         ex("priority char set Nihilux result lost 90 Firefly"),
         ex("priority char set Nihilux result skip"),
@@ -152,7 +152,7 @@ def handle_debug_toggle(state, command):
 
     status = "enabled" if enabled else "disabled"
     dest   = "data/debug.log" if target == "file" else "terminal"
-    print(f"[OK] Debug {target} {status} — {'writing to ' + dest if enabled else 'not writing to ' + dest}")
+    print(f"[OK] Debug {target} {status} -- {'writing to ' + dest if enabled else 'not writing to ' + dest}")
 
 
 # -------------------------
@@ -167,7 +167,7 @@ def handle_set_pulls(state, command):
     state["pulls"]["sp"] = sp
     save_state(state)
     write_log("SET_PULLS", {"sj": sj, "sp": sp})
-    print(f"[OK] Pulls set — SJ: {sj}  SP: {sp}")
+    print(f"[OK] Pulls set -- SJ: {sj}  SP: {sp}")
 
 @register(("add", "pulls"))
 def handle_add_pulls(state, command):
@@ -178,7 +178,7 @@ def handle_add_pulls(state, command):
     state["pulls"]["sp"] += sp
     save_state(state)
     write_log("ADD_PULLS", {"sj": sj, "sp": sp})
-    print(f"[OK] Pulls updated — SJ: {state['pulls']['sj']}  SP: {state['pulls']['sp']}")
+    print(f"[OK] Pulls updated -- SJ: {state['pulls']['sj']}  SP: {state['pulls']['sp']}")
 
 @register(("subtract", "pulls"))
 def handle_subtract_pulls(state, command):
@@ -189,7 +189,7 @@ def handle_subtract_pulls(state, command):
     state["pulls"]["sp"] = max(0, state["pulls"]["sp"] - sp)
     save_state(state)
     write_log("SUBTRACT_PULLS", {"sj": sj, "sp": sp})
-    print(f"[OK] Pulls updated — SJ: {state['pulls']['sj']}  SP: {state['pulls']['sp']}")
+    print(f"[OK] Pulls updated -- SJ: {state['pulls']['sj']}  SP: {state['pulls']['sp']}")
 
 
 # -------------------------
@@ -331,7 +331,7 @@ def handle_set_claimable(state, command):
     if field == "count":
         print(f"[OK] {name} count: {payload.get('count_completed')} / {payload.get('count_total')}")
     elif field == "name":
-        print(f"[OK] Renamed '{name}' → '{payload.get('value')}'")
+        print(f"[OK] Renamed '{name}' -> '{payload.get('value')}'")
     else:
         print(f"[OK] {name} {field} = {payload.get('value')}")
 
@@ -349,7 +349,7 @@ def handle_subtract_claimable(state, command):
     entry["sp"] = max(0, entry.get("sp", 0) - sp)
     save_state(state)
     write_log("SUBTRACT_CLAIMABLE", {"name": name, "sj": sj, "sp": sp})
-    print(f"[OK] {name} — SJ: {entry['sj']}  SP: {entry['sp']}")
+    print(f"[OK] {name} -- SJ: {entry['sj']}  SP: {entry['sp']}")
 
 @register(("remove", "claimable"))
 def handle_remove_claimable(state, command):
@@ -394,7 +394,7 @@ def handle_set_priority_order(state, command):
     save_state(state)
     write_log("SET_PRIORITY_ORDER", {"name": name, "order": order})
     actual_order = state["priority"][name]["order"]
-    print(f"[OK] {name} order → {actual_order}")
+    print(f"[OK] {name} order -> {actual_order}")
 
 @register(("set", "priority_type"))
 def handle_set_priority_type(state, command):
@@ -404,7 +404,7 @@ def handle_set_priority_type(state, command):
     update_priority_field(state, name, "type", ptype)
     save_state(state)
     write_log("SET_PRIORITY_TYPE", {"name": name, "type": ptype})
-    print(f"[OK] {name} type → {ptype}")
+    print(f"[OK] {name} type -> {ptype}")
 
 @register(("set", "priority_eidolon"))
 def handle_set_priority_eidolon(state, command):
@@ -414,7 +414,7 @@ def handle_set_priority_eidolon(state, command):
     update_priority_field(state, name, "target_eidolon", eidolon)
     save_state(state)
     write_log("SET_PRIORITY_EIDOLON", {"name": name, "eidolon": eidolon})
-    print(f"[OK] {name} target Eidolon → E{eidolon}  ({eidolon + 1} copies)")
+    print(f"[OK] {name} target Eidolon -> E{eidolon}  ({eidolon + 1} copies)")
 
 @register(("set", "priority_superimposition"))
 def handle_set_priority_superimposition(state, command):
@@ -424,7 +424,7 @@ def handle_set_priority_superimposition(state, command):
     update_priority_field(state, name, "target_superimposition", superimposition)
     save_state(state)
     write_log("SET_PRIORITY_SUPERIMPOSITION", {"name": name, "superimposition": superimposition})
-    print(f"[OK] {name} target Superimposition → S{superimposition}  ({superimposition} copies)")
+    print(f"[OK] {name} target Superimposition -> S{superimposition}  ({superimposition} copies)")
 
 @register(("set", "priority_char_result"))
 def handle_set_char_result(state, command):

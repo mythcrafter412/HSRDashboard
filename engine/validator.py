@@ -81,7 +81,7 @@ def validate(command, state):
     if action == "set" and subdomain == "luck":
         if payload.get("field") not in ["charpulls", "lcpulls", "winrate",
                                          "lcrate", "charstreak", "lcstreak"]:
-            return False, "Unknown luck field — use: charpulls lcpulls winrate lcrate charstreak lcstreak"
+            return False, "Unknown luck field -- use: charpulls lcpulls winrate lcrate charstreak lcstreak"
         try:
             float(payload["value"])
         except (ValueError, TypeError, KeyError):
@@ -127,7 +127,7 @@ def validate(command, state):
             return False, "Missing name"
         field = payload.get("field")
         if field not in ["sj", "sp", "name", "abbr", "count"]:
-            return False, f"Unknown field '{field}' — use: sj sp name abbr count"
+            return False, f"Unknown field '{field}' -- use: sj sp name abbr count"
         if field in ["sj", "sp"]:
             try:
                 int(payload["value"])

@@ -1,7 +1,7 @@
 from engine.debug import trace
 
 
-# Claimables that cannot be removed — they are ongoing permanent sources
+# Claimables that cannot be removed -- they are ongoing permanent sources
 PERMANENT = {
     "Achievements",
     "Divergent_Universe",
@@ -112,7 +112,7 @@ def remove_claimable(state, command):
 
     if state["claimables"][name].get("permanent"):
         trace(state, "CLAIMABLES", f"refused remove of permanent: {name}")
-        return state, f"'{name}' is permanent — use 'set claimable {name} sj 0' to zero it out"
+        return state, f"'{name}' is permanent -- use 'set claimable {name} sj 0' to zero it out"
 
     del state["claimables"][name]
     trace(state, "CLAIMABLES", f"removed {name}")

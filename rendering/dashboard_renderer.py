@@ -124,7 +124,7 @@ def render_dashboard(state):
 
             if result in ("won", "lost"):
                 s = f"spent: {spent} SP" if spent else "spent: ?"
-                lines.append(f"{order}. {display(name):<18}  RESOLVED  ({s} — 50/50: {result})")
+                lines.append(f"{order}. {display(name):<18}  RESOLVED  ({s} -- 50/50: {result})")
                 total_char_high += spent or 0
                 total_char_low  += spent or 0
             elif result == "skip":
@@ -174,7 +174,7 @@ def render_dashboard(state):
 
             if result in ("won", "lost"):
                 s = f"spent: {spent} SP" if spent else "spent: ?"
-                lines.append(f"{order}. {lc_label:<18}  RESOLVED  ({s} — 75/25: {result})")
+                lines.append(f"{order}. {lc_label:<18}  RESOLVED  ({s} -- 75/25: {result})")
                 total_lc_high += spent or 0
                 total_lc_low  += spent or 0
             elif result == "skip":
@@ -210,7 +210,7 @@ def render_dashboard(state):
 
         def row_str(r):
             if not r:
-                return "  —", "  —"
+                return "  --", "  --"
             s = r["status"]
             if s == "RESOLVED":
                 v = f"{r['spent'] or '?'} SP (done)"

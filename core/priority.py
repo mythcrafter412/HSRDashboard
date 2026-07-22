@@ -1,6 +1,5 @@
 CHAR_HARD_PITY = 90
 LC_HARD_PITY   = 80
-LC_AVG_PULLS   = 50
 
 
 # -----------------------------
@@ -95,15 +94,15 @@ def update_luck_from_history(state):
     Recompute avg_pulls_char, avg_pulls_lc, win_rate, lc_win_rate from pull_history.
 
     Avg pulls = flat average of pulls-to-result (the "spent" field) across every
-    event where a 5-star was actually obtained — win, loss, or guarantee-completion
+    event where a 5-star was actually obtained -- win, loss, or guarantee-completion
     each contribute their own value independently (a loss+guarantee pair is NOT
     combined into one figure). Abandoned/skipped entries (partial pulls with no
-    5-star reached) are excluded — they never got a result, so they can't
+    5-star reached) are excluded -- they never got a result, so they can't
     contribute to "pulls per 5-star."
 
     Win rate = clean wins / (clean wins + loss-then-guarantee cycles).
     Here a loss+guarantee pair IS counted as a single cycle (denominator-only
-    increase on the guarantee win) — this is a separate concern from the average.
+    increase on the guarantee win) -- this is a separate concern from the average.
     """
     history = state.get("pull_history", {})
     luck    = state.get("luck", {})
@@ -129,7 +128,7 @@ def update_luck_from_history(state):
                 total_cycles += 1
             elif entry.get("via_guarantee"):
                 total_cycles += 1
-            # "lost" entries not yet linked to a guarantee are in-progress —
+            # "lost" entries not yet linked to a guarantee are in-progress --
             # not counted toward win rate until the guarantee resolves them
 
         if total_cycles:
@@ -156,7 +155,7 @@ def _record_result(state, kind, result, spent, lost_to=None, name=None):
 
     if result == "skip":
         # Global pity.count/guaranteed are tracked separately (via `dashboard
-        # pity`) and already carry over untouched — this never resets them.
+        # pity`) and already carry over untouched -- this never resets them.
         # If partial pulls were made toward this character before giving up,
         # log them as a bookkeeping entry so the character's historical total
         # reflects it. It's not a resolved 5-star, so it never counts toward
@@ -178,7 +177,7 @@ def _record_result(state, kind, result, spent, lost_to=None, name=None):
         if was_guaranteed:
             # This win COMPLETES a loss->guarantee cycle.
             # Find the most recent unlinked "lost" entry for THIS character to
-            # link to — pity/guarantee is banner-wide, but a resolved cycle
+            # link to -- pity/guarantee is banner-wide, but a resolved cycle
             # only makes sense tied to the character that was actually lost.
             entries = history[kind]
             linked  = False
@@ -234,7 +233,7 @@ def _record_result(state, kind, result, spent, lost_to=None, name=None):
             "linked":  False,
         })
         update_luck_from_history(state)
-        # Streak isn't touched here — it only resolves once the guarantee
+        # Streak isn't touched here -- it only resolves once the guarantee
         # pull comes in and closes the cycle (see "won" branch above).
 
 
@@ -269,7 +268,7 @@ def compute_floors(luck, char_pity=0, char_guaranteed=False,
     char_remaining = CHAR_HARD_PITY - char_pity
     lc_remaining   = LC_HARD_PITY   - lc_pity
 
-    # HIGH FLOOR (first copy only — pity resets after)
+    # HIGH FLOOR (first copy only -- pity resets after)
     char_high_first = char_remaining if char_guaranteed else char_remaining + CHAR_HARD_PITY
     lc_high_first   = lc_remaining   if lc_guaranteed   else lc_remaining   + LC_HARD_PITY
 

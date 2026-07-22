@@ -49,11 +49,11 @@ def _render_section(title, entries, luck, streak_key, loss_streak_key, avg_key, 
         lines.append("")
         return lines
 
-    # Running total — every pull actually spent counts here (including
+    # Running total -- every pull actually spent counts here (including
     # abandoned/skipped attempts), unlike avg_pulls which only counts pulls
     # that ended in an actual 5-star. Only accumulates across BACK-TO-BACK
     # entries for the same character (e.g. a loss immediately followed by
-    # its guarantee, or repeated eidolon copies pulled in a row) — it resets
+    # its guarantee, or repeated eidolon copies pulled in a row) -- it resets
     # the moment a different character's entry appears in between, since a
     # later attempt (a different banner, versions later) isn't a continuation
     # of the earlier one even if it's the same character again.

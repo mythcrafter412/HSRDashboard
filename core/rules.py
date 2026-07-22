@@ -137,7 +137,7 @@ def compute_affordability(state):
                     name, "BLOCKED",
                     floors["lc_high"], floors["lc_low"],
                     pool_high, pool_low,
-                    note="Lost char 50/50 — skip LC"
+                    note="Lost char 50/50 -- skip LC"
                 ))
                 continue
 

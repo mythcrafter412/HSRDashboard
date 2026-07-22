@@ -3,7 +3,7 @@ import os
 
 # Bump this whenever data/state.json's shape changes, and add a matching
 # migrations/00N_description.py exposing TARGET_VERSION and upgrade(state).
-# There's no migration needed to reach version 1 — it's the baseline shape
+# There's no migration needed to reach version 1 -- it's the baseline shape
 # as of when this system was introduced, and existing save files are already
 # compliant with it, so a missing _meta.schema_version is treated as current
 # rather than as "version 0".

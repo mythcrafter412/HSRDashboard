@@ -1,3 +1,5 @@
+import sys
+
 from core.state import load_state
 from core.utils import get_version
 from engine.executor import execute
@@ -6,11 +8,21 @@ from engine.loader import load_renderers
 
 
 def main():
+    # Safety net: some Windows console codepages can't encode every
+    # character the app might print. Never let that crash the app --
+    # worst case a character shows oddly instead of raising.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="replace")
+            except Exception:
+                pass
+
     load_renderers()
 
     state = load_state()
 
-    print(f"// HSR PULL PLANNER v{get_version()} —  type 'help' for commands")
+    print(f"// HSR PULL PLANNER v{get_version()} --  type 'help' for commands")
 
     while True:
         user_input = input("> ")

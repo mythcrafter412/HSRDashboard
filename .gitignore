@@ -5,5 +5,11 @@ data/
 __pycache__/
 *.pyc
 
-# Local staging folder for updater
-staging/
+# PyInstaller build output
+build/
+dist/
+*.spec
+
+# In case the compiled updater exe is ever run from inside the repo folder,
+# it creates app\ (a copy of the source) next to itself — never track that
+app/

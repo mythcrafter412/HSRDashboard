@@ -17,7 +17,7 @@ def get_data_dir():
     Resolve the directory for state.json/history_log.json/debug.log.
 
     updater.py sets HSR_DATA_DIR before launching the app, pointing at
-    %APPDATA%\\HSRDashboard\\data — a sibling of app\\, not nested inside
+    %APPDATA%\\HSRDashboard\\data -- a sibling of app\\, not nested inside
     it, so save data survives every update (app\\ gets wiped and replaced
     each time). Falls back to a data\\ folder next to this repo's root for
     standalone `python main.py` use, where there's no app\\/data\\ split.
@@ -30,12 +30,12 @@ def get_data_dir():
 
 
 def display(name):
-    """Convert stored name format to display format: Yao_Guang → Yao Guang"""
+    """Convert stored name format to display format: Yao_Guang -> Yao Guang"""
     return str(name).replace("_", " ")
 
 
 def to_key(name):
-    """Convert display/input name to storage key: Yao Guang → Yao_Guang"""
+    """Convert display/input name to storage key: Yao Guang -> Yao_Guang"""
     return str(name).replace(" ", "_")
 
 

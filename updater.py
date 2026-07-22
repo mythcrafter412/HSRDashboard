@@ -16,11 +16,11 @@ USER_AGENT = "HSRDashboard-Updater"
 def _install_root():
     """
     Portable install: app\\ and data\\ live next to this exe (or, when run
-    as a plain script, next to updater.py) wherever the user put it — not
+    as a plain script, next to updater.py) wherever the user put it -- not
     tucked away in %APPDATA%. Lets the whole install be moved as one folder.
 
     getattr(sys, "frozen", False) and sys.executable are how PyInstaller
-    reports "I'm a compiled exe" and its real path — this needs no extra
+    reports "I'm a compiled exe" and its real path -- this needs no extra
     dependency, both are stdlib/interpreter-provided.
     """
     if getattr(sys, "frozen", False):
@@ -98,7 +98,7 @@ def download_and_install(zip_url):
             zf.extractall(extract_dir)
 
         # GitHub zipballs wrap everything in a single top-level
-        # "{repo}-{commit}" folder — unwrap it before copying into app\.
+        # "{repo}-{commit}" folder -- unwrap it before copying into app\.
         entries = os.listdir(extract_dir)
         if len(entries) == 1 and os.path.isdir(os.path.join(extract_dir, entries[0])):
             source_root = os.path.join(extract_dir, entries[0])
@@ -113,12 +113,12 @@ def download_and_install(zip_url):
 def run_app():
     """
     Loads app\\main.py with this process's own (bundled, when frozen)
-    Python interpreter and runs it — no separately compiled main exe needed.
+    Python interpreter and runs it -- no separately compiled main exe needed.
     """
     app_dir  = _app_dir()
     main_py  = os.path.join(app_dir, "main.py")
 
-    # Must be set before importing anything from app\ — core/state.py,
+    # Must be set before importing anything from app\ -- core/state.py,
     # core/log.py, and engine/debug.py all read this at import time to keep
     # save data in data\ (a sibling of app\) instead of nested inside app\,
     # which gets wiped and replaced on every update.
@@ -151,12 +151,22 @@ def _prompt(options):
 
 
 def main():
+    # Safety net: some Windows console codepages can't encode every
+    # character the app might print. Never let that crash the app --
+    # worst case a character shows oddly instead of raising.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="replace")
+            except Exception:
+                pass
+
     print("// HSR Dashboard Updater")
 
     release = fetch_latest_release()
     offline = release == "offline"
     if offline:
-        print("[WARN] Couldn't reach GitHub — skipping update check.")
+        print("[WARN] Couldn't reach GitHub -- skipping update check.")
         release = None
 
     local_version = get_local_version()
