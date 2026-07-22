@@ -8,8 +8,8 @@ import urllib.error
 import urllib.request
 import zipfile
 
-REPO      = "mythcrafter412/HSRDashboard"
-API_LATEST_RELEASE = f"https://api.github.com/repos/{REPO}/releases/latest"
+REPO       = "mythcrafter412/HSRDashboard"
+API_RELEASES = f"https://api.github.com/repos/{REPO}/releases"
 USER_AGENT = "HSRDashboard-Updater"
 
 
@@ -46,23 +46,38 @@ def get_local_version():
 
 def fetch_latest_release():
     """
-    Returns a dict describing the latest GitHub Release, None if the repo
-    has no releases published yet, or "offline" if the request failed
-    (network down, DNS, etc.) so the caller can degrade gracefully.
+    Returns a dict describing the latest published GitHub Release, None if
+    the repo has none, or "offline" if the request failed (network down,
+    DNS, etc.) so the caller can degrade gracefully.
+
+    Deliberately hits /releases (the list endpoint) instead of the seemingly
+    more convenient /releases/latest -- that endpoint's own docs say it
+    returns "the most recent non-prerelease, non-draft release", i.e. it
+    silently EXCLUDES pre-releases entirely, returning 404 if that's all
+    that exists. Since this app is meant to support a pre-release/beta
+    channel, that shortcut can't be used -- list everything published and
+    take the newest instead.
     """
     req = urllib.request.Request(
-        API_LATEST_RELEASE,
+        API_RELEASES,
         headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.load(resp)
+            releases = json.load(resp)
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return None
         return "offline"
     except urllib.error.URLError:
         return "offline"
+
+    published = [r for r in releases if not r.get("draft")]
+    if not published:
+        return None
+
+    published.sort(key=lambda r: r.get("published_at") or r.get("created_at") or "", reverse=True)
+    data = published[0]
 
     tag     = data.get("tag_name", "")
     version = tag[1:] if tag.startswith("v") else tag
