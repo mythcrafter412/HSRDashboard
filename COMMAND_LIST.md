@@ -1,0 +1,74 @@
+// Navigation
+  open <view>
+  e.g.  open dashboard  |  open claimables  |  open pull_history
+
+// Dashboard -- Pulls
+  dashboard pulls set <sj> <sp>         overwrite
+  dashboard pulls add <sj> <sp>          add to existing
+  dashboard pulls subtract <sj> <sp>     subtract from existing
+  e.g.  dashboard pulls set 1058 210
+
+// Dashboard -- Future Versions
+  dashboard future add <version> <sj|*> <sp|*> [chars] <notes>
+        * = unknown / omit.  chars in [brackets, comma separated]
+  e.g.  dashboard future add v4.3 * 100 [Himeko Nova, Robin SP] N/A
+  dashboard future set <version> <sj|sp|characters|notes> <value>
+  dashboard future remove <version>
+
+// Dashboard -- Luck
+  dashboard luck set <field> <value>
+        fields: charpulls  lcpulls  winrate  lcrate  charstreak  lcstreak
+  e.g.  dashboard luck set charpulls 63.1
+
+// Dashboard -- Pity  (shared across all limited banners)
+  dashboard pity set char <count> [guaranteed|fresh]
+  dashboard pity set lc <count> [guaranteed|fresh]
+  e.g.  dashboard pity set char 45 guaranteed
+
+// Claimables
+  claimables claimable add <name> <sj> <sp> [abbr]
+  claimables claimable set <name> <field> <value>
+        fields:  sj <n>  |  sp <n>  |  name <newname>  |  abbr <newabbr>
+                 count <completed> <total>  (achievements only)
+  claimables claimable subtract <name> <sj> <sp>
+  claimables claimable remove <name or abbreviation>
+        Achievements, Divergent_Universe, Currency_Wars, Nameless_Honor
+        are permanent and cannot be removed.
+
+// Priority
+  priority char add <name> <order> [char|lc|both]
+        type defaults to 'both' if omitted
+        inserting at an occupied order shifts existing entries down
+  e.g.  priority char add Nihilux 1 both
+  e.g.  priority char add Firefly 2 lc
+  priority char set <name> type <char|lc|both>
+  priority char set <name> order <n>
+        moving to an occupied order shifts everything between old/new position
+  priority char set <name> eidolon <0-6>
+        target Eidolon level -- determines copies needed (E0=1 copy ... E6=7 copies)
+  e.g.  priority char set Nihilux eidolon 2
+  priority char set <name> superimposition <1-5>
+        target Superimposition level -- determines LC copies needed (S1=1 ... S5=5)
+  e.g.  priority char set Nihilux superimposition 1
+  priority char set <name> result <won|lost|skip> [spent_sp] [lost_to]
+        auto-updates pity, luck stats, and win/loss streak
+        lost_to only applies when result is 'lost'
+        skip with a spent_sp value logs partial pulls abandoned without a
+          5-star (doesn't touch global pity/guaranteed -- track those via
+          'dashboard pity' -- and never counts toward the avg-pulls stat)
+  e.g.  priority char set Nihilux result won 65
+  e.g.  priority char set Nihilux result lost 90 Firefly
+  e.g.  priority char set Nihilux result skip
+  e.g.  priority char set Nihilux result skip 22
+  priority char remove <name>
+  priority lc set <name> result <won|lost|skip> [spent_sp] [lost_to]
+  e.g.  priority lc set Nihilux result won 43
+  e.g.  priority lc set Nihilux result lost 60 Firefly
+
+// Debug
+  debug file enable|disable      write trace to data/debug.log  (default: on)
+  debug terminal enable|disable  show trace in terminal          (default: off)
+
+// Other
+  help / commands
+  exit / quit
