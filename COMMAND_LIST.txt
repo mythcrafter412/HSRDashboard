@@ -1,3 +1,5 @@
+// A full list of commands that is also accessible within this tool via "help"
+
 // Navigation
   open <view>
   e.g.  open dashboard  |  open claimables  |  open pull_history
