@@ -25,7 +25,12 @@ def main():
     print(f"// HSR PULL PLANNER v{get_version()} --  type 'help' for commands")
 
     while True:
-        user_input = input("> ")
+        try:
+            user_input = input("> ")
+        except EOFError:
+            # stdin closed unexpectedly (piped input ran out, stray Ctrl+Z) --
+            # exit cleanly instead of crashing, same as typing 'exit'.
+            break
 
         if user_input.lower() in ["exit", "quit"]:
             break

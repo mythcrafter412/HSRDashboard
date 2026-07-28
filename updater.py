@@ -12,6 +12,44 @@ REPO       = "mythcrafter412/HSRDashboard"
 API_RELEASES = f"https://api.github.com/repos/{REPO}/releases"
 USER_AGENT = "HSRDashboard-Updater"
 
+# Session-local (no "Global\" prefix) rather than machine-wide -- this is a
+# personal single-user app, so the lock only needs to cover "don't let me
+# double-launch this in my own session," not interfere across other Windows
+# accounts/sessions on a shared machine, which "Global\" would do unnecessarily.
+_SINGLE_INSTANCE_MUTEX_NAME = "HSRDashboard_SingleInstance_Mutex"
+_ERROR_ALREADY_EXISTS       = 183
+
+# Kept at module scope so the handle stays alive (and the lock held) for the
+# whole process lifetime -- Windows releases it automatically on exit either way.
+_instance_mutex_handle = None
+
+
+def _acquire_single_instance_lock():
+    """
+    Windows-only single-instance guard via a named mutex (ctypes -- stdlib,
+    no extra dependency). Two instances writing to the same data\\state.json
+    at once risks one silently clobbering the other's save on exit, so a
+    second launch is refused rather than allowed to run alongside the first.
+
+    Returns True if this is the only running instance, False if another one
+    already holds the lock. Fails open (returns True) on non-Windows or if
+    the mutex API call itself fails, rather than ever blocking the user over
+    a platform this hasn't been tested on.
+    """
+    global _instance_mutex_handle
+
+    if sys.platform != "win32":
+        return True
+
+    import ctypes
+    try:
+        _instance_mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, False, _SINGLE_INSTANCE_MUTEX_NAME)
+        if not _instance_mutex_handle:
+            return True
+        return ctypes.windll.kernel32.GetLastError() != _ERROR_ALREADY_EXISTS
+    except Exception:
+        return True
+
 
 def _install_root():
     """
@@ -177,6 +215,11 @@ def main():
                 pass
 
     print("// HSR Dashboard Updater")
+
+    if not _acquire_single_instance_lock():
+        print("[ERROR] HSRDashboard is already running -- close the other window first.")
+        _wait_for_enter("Press Enter to exit...")
+        return
 
     release = fetch_latest_release()
     offline = release == "offline"

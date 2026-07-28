@@ -25,16 +25,19 @@ def parse(raw_input: str):
         return {"action": "open", "view": parts[1].lower()}
 
     if first == "debug":
+        # File logging (logs/latest.log, logs/debug.log) is always on and
+        # unconditional -- only whether trace lines ALSO print live to the
+        # terminal is still a toggle.
         if len(parts) != 3:
             return None
         target = parts[1].lower()
         toggle = parts[2].lower()
-        if target not in ["file", "terminal"] or toggle not in ["enable", "disable"]:
+        if target != "terminal" or toggle not in ["enable", "disable"]:
             return None
         return {
             "action":    "debug",
             "subdomain": "debug",
-            "payload":   {"target": target, "enabled": toggle == "enable"}
+            "payload":   {"enabled": toggle == "enable"}
         }
 
     # -------------------------

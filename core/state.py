@@ -1,8 +1,10 @@
 import json
 import os
+import shutil
 
 from core.migrate import CURRENT_SCHEMA_VERSION, check_and_migrate
 from core.utils import get_data_dir
+from engine.debug import trace
 
 STATE_FILE = os.path.join(get_data_dir(), "state.json")
 
@@ -32,7 +34,6 @@ def create_initial_state():
         },
         "config": {
             "sj_per_sp":      160,
-            "debug_file":     True,
             "debug_terminal": False
         }
     }
@@ -44,19 +45,35 @@ def load_state():
         save_state(state)
         return state
 
-    with open(STATE_FILE, "r") as f:
-        state = json.load(f)
+    try:
+        with open(STATE_FILE, "r") as f:
+            state = json.load(f)
+    except json.JSONDecodeError as e:
+        trace(None, "CRITICAL", "STATE", f"state.json is corrupted and could not be parsed: {e}")
+        backup_path = STATE_FILE + ".corrupted"
+        try:
+            shutil.copy(STATE_FILE, backup_path)
+            print(f"[ERROR] Your save file was corrupted and could not be read. "
+                  f"A copy was saved to {backup_path} for recovery. Starting a fresh save.")
+        except Exception:
+            print("[ERROR] Your save file was corrupted and could not be read. Starting a fresh save.")
+        state = create_initial_state()
+        save_state(state)
+        return state
 
     state, applied = check_and_migrate(state)
     if applied:
-        print(f"[MIGRATE] Applied schema migration(s): {', '.join(str(v) for v in applied)}")
+        trace(state, "INFO", "STATE", f"Applied schema migration(s): {', '.join(str(v) for v in applied)}")
     save_state(state)  # persist the schema_version stamp even when no migration ran
 
     return state
 
 
 def save_state(state):
-    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
-
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f, indent=2)
+    try:
+        os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+        with open(STATE_FILE, "w") as f:
+            json.dump(state, f, indent=2)
+    except OSError as e:
+        trace(state, "CRITICAL", "STATE", f"Failed to save state.json: {e}")
+        print(f"[ERROR] Could not save your progress: {e}")

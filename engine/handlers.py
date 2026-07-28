@@ -2,7 +2,6 @@ from core.claimables import add_claimable, remove_claimable, set_claimable, reso
 from core.priority import (add_priority, remove_priority, update_priority_field,
                             set_priority_order, record_char_result, record_lc_result)
 from core.state import save_state
-from core.log import write_log
 from core.utils import get_version
 from rendering.registry import get_view
 from engine.debug import trace
@@ -105,8 +104,11 @@ def handle_help(state, command):
         ex("priority lc set Nihilux result lost 60 Firefly"),
 
         sec("Debug"),
-        cmd("debug file enable|disable      write trace to data/debug.log  (default: on)"),
-        cmd("debug terminal enable|disable  show trace in terminal          (default: off)"),
+        cmd("debug terminal enable|disable  show trace lines live in terminal  (default: off)"),
+        note("logs/latest.log (INFO+) and logs/debug.log (everything) are always"),
+        note("written each session regardless of this -- it only controls whether"),
+        note("trace lines ALSO print live to the console as they happen"),
+        note("prior session's logs are gzip-archived into logs/archive/ on launch"),
 
         sec("Other"),
         cmd("help / commands"),
@@ -127,12 +129,12 @@ def handle_open_view(state, command):
     renderer  = get_view(view_name)
 
     if not renderer:
-        trace(state, "HANDLER", f"No view registered: {view_name}")
+        trace(state, "WARN", "HANDLER", f"No view registered: {view_name}")
         print(f"[ERROR] Unknown view: '{view_name}'")
         return
 
     print(renderer(state))
-    write_log("OPEN_VIEW", {"view": view_name})
+    trace(state, "INFO", "HANDLER", f"OPEN_VIEW {{'view': '{view_name}'}}")
 
 
 # -------------------------
@@ -142,17 +144,14 @@ def handle_open_view(state, command):
 def handle_debug_toggle(state, command):
 
     payload = command.get("payload", {})
-    target  = payload.get("target")
     enabled = payload.get("enabled")
 
     state.setdefault("config", {})
-    key = "debug_file" if target == "file" else "debug_terminal"
-    state["config"][key] = enabled
+    state["config"]["debug_terminal"] = enabled
     save_state(state)
 
     status = "enabled" if enabled else "disabled"
-    dest   = "data/debug.log" if target == "file" else "terminal"
-    print(f"[OK] Debug {target} {status} -- {'writing to ' + dest if enabled else 'not writing to ' + dest}")
+    print(f"[OK] Debug terminal {status} -- {'now printing' if enabled else 'no longer printing'} trace lines live")
 
 
 # -------------------------
@@ -166,7 +165,7 @@ def handle_set_pulls(state, command):
     state["pulls"]["sj"] = sj
     state["pulls"]["sp"] = sp
     save_state(state)
-    write_log("SET_PULLS", {"sj": sj, "sp": sp})
+    trace(state, "INFO", "HANDLER", f"SET_PULLS {{'sj': {sj}, 'sp': {sp}}}")
     print(f"[OK] Pulls set -- SJ: {sj}  SP: {sp}")
 
 @register(("add", "pulls"))
@@ -177,7 +176,7 @@ def handle_add_pulls(state, command):
     state["pulls"]["sj"] += sj
     state["pulls"]["sp"] += sp
     save_state(state)
-    write_log("ADD_PULLS", {"sj": sj, "sp": sp})
+    trace(state, "INFO", "HANDLER", f"ADD_PULLS {{'sj': {sj}, 'sp': {sp}}}")
     print(f"[OK] Pulls updated -- SJ: {state['pulls']['sj']}  SP: {state['pulls']['sp']}")
 
 @register(("subtract", "pulls"))
@@ -188,7 +187,7 @@ def handle_subtract_pulls(state, command):
     state["pulls"]["sj"] = max(0, state["pulls"]["sj"] - sj)
     state["pulls"]["sp"] = max(0, state["pulls"]["sp"] - sp)
     save_state(state)
-    write_log("SUBTRACT_PULLS", {"sj": sj, "sp": sp})
+    trace(state, "INFO", "HANDLER", f"SUBTRACT_PULLS {{'sj': {sj}, 'sp': {sp}}}")
     print(f"[OK] Pulls updated -- SJ: {state['pulls']['sj']}  SP: {state['pulls']['sp']}")
 
 
@@ -212,7 +211,7 @@ def handle_add_future(state, command):
         "sj": sj, "sp": sp, "characters": chars, "notes": notes
     }
     save_state(state)
-    write_log("ADD_FUTURE_VERSION", {"version": version})
+    trace(state, "INFO", "HANDLER", f"ADD_FUTURE_VERSION {{'version': '{version}'}}")
     print(f"[OK] Added future version: {version}")
 
 @register(("set", "future_field"))
@@ -234,7 +233,7 @@ def handle_set_future_field(state, command):
     elif field == "notes":
         fv[version]["notes"] = value
     save_state(state)
-    write_log("SET_FUTURE_FIELD", {"version": version, "field": field})
+    trace(state, "INFO", "HANDLER", f"SET_FUTURE_FIELD {{'version': '{version}', 'field': '{field}'}}")
     print(f"[OK] {version} {field} updated")
 
 @register(("remove", "future"))
@@ -246,7 +245,7 @@ def handle_remove_future(state, command):
         return
     del state["future_versions"][version]
     save_state(state)
-    write_log("REMOVE_FUTURE_VERSION", {"version": version})
+    trace(state, "INFO", "HANDLER", f"REMOVE_FUTURE_VERSION {{'version': '{version}'}}")
     print(f"[OK] Removed future version: {version}")
 
 
@@ -272,7 +271,7 @@ def handle_set_luck(state, command):
         return
     state.setdefault("luck", {})[key] = value
     save_state(state)
-    write_log("SET_LUCK", {"field": field, "value": value})
+    trace(state, "INFO", "HANDLER", f"SET_LUCK {{'field': '{field}', 'value': {value}}}")
     print(f"[OK] Luck {field} = {value}")
 
 
@@ -295,7 +294,7 @@ def handle_set_pity(state, command):
         entry["guaranteed"] = guaranteed
 
     save_state(state)
-    write_log("SET_PITY", {"banner": banner, "count": count, "guaranteed": guaranteed})
+    trace(state, "INFO", "HANDLER", f"SET_PITY {{'banner': '{banner}', 'count': {count}, 'guaranteed': {guaranteed}}}")
 
     parts = []
     if count is not None:
@@ -314,7 +313,7 @@ def handle_add_claimable(state, command):
     payload = command.get("payload", {})
     add_claimable(state, payload)
     save_state(state)
-    write_log("ADD_CLAIMABLE", payload)
+    trace(state, "INFO", "HANDLER", f"ADD_CLAIMABLE {payload}")
     print(f"[OK] Added claimable: {payload.get('name')}")
 
 @register(("set", "claimable_field"))
@@ -325,7 +324,7 @@ def handle_set_claimable(state, command):
         print(f"[ERROR] {msg}")
         return
     save_state(state)
-    write_log("SET_CLAIMABLE", payload)
+    trace(state, "INFO", "HANDLER", f"SET_CLAIMABLE {payload}")
     field = payload.get("field")
     name  = payload.get("name")
     if field == "count":
@@ -348,7 +347,7 @@ def handle_subtract_claimable(state, command):
     entry["sj"] = max(0, entry.get("sj", 0) - sj)
     entry["sp"] = max(0, entry.get("sp", 0) - sp)
     save_state(state)
-    write_log("SUBTRACT_CLAIMABLE", {"name": name, "sj": sj, "sp": sp})
+    trace(state, "INFO", "HANDLER", f"SUBTRACT_CLAIMABLE {{'name': '{name}', 'sj': {sj}, 'sp': {sp}}}")
     print(f"[OK] {name} -- SJ: {entry['sj']}  SP: {entry['sp']}")
 
 @register(("remove", "claimable"))
@@ -359,7 +358,7 @@ def handle_remove_claimable(state, command):
         print(f"[ERROR] {msg}")
         return
     save_state(state)
-    write_log("REMOVE_CLAIMABLE", payload)
+    trace(state, "INFO", "HANDLER", f"REMOVE_CLAIMABLE {payload}")
     print(f"[OK] Removed claimable: {payload.get('name')}")
 
 
@@ -372,7 +371,7 @@ def handle_add_priority(state, command):
     name    = payload.get("name")
     add_priority(state, payload)
     save_state(state)
-    write_log("ADD_PRIORITY", payload)
+    trace(state, "INFO", "HANDLER", f"ADD_PRIORITY {payload}")
     actual_order = state["priority"][name]["order"]
     print(f"[OK] Added to priority: {name}  order={actual_order}  type={payload.get('type', 'both')}")
 
@@ -382,7 +381,7 @@ def handle_remove_priority(state, command):
     name    = payload.get("name")
     remove_priority(state, name)
     save_state(state)
-    write_log("REMOVE_PRIORITY", {"name": name})
+    trace(state, "INFO", "HANDLER", f"REMOVE_PRIORITY {{'name': '{name}'}}")
     print(f"[OK] Removed from priority: {name}")
 
 @register(("set", "priority_order"))
@@ -392,7 +391,7 @@ def handle_set_priority_order(state, command):
     order   = payload.get("order")
     set_priority_order(state, name, order)
     save_state(state)
-    write_log("SET_PRIORITY_ORDER", {"name": name, "order": order})
+    trace(state, "INFO", "HANDLER", f"SET_PRIORITY_ORDER {{'name': '{name}', 'order': {order}}}")
     actual_order = state["priority"][name]["order"]
     print(f"[OK] {name} order -> {actual_order}")
 
@@ -403,7 +402,7 @@ def handle_set_priority_type(state, command):
     ptype   = payload.get("type")
     update_priority_field(state, name, "type", ptype)
     save_state(state)
-    write_log("SET_PRIORITY_TYPE", {"name": name, "type": ptype})
+    trace(state, "INFO", "HANDLER", f"SET_PRIORITY_TYPE {{'name': '{name}', 'type': '{ptype}'}}")
     print(f"[OK] {name} type -> {ptype}")
 
 @register(("set", "priority_eidolon"))
@@ -413,7 +412,7 @@ def handle_set_priority_eidolon(state, command):
     eidolon = payload.get("eidolon")
     update_priority_field(state, name, "target_eidolon", eidolon)
     save_state(state)
-    write_log("SET_PRIORITY_EIDOLON", {"name": name, "eidolon": eidolon})
+    trace(state, "INFO", "HANDLER", f"SET_PRIORITY_EIDOLON {{'name': '{name}', 'eidolon': {eidolon}}}")
     print(f"[OK] {name} target Eidolon -> E{eidolon}  ({eidolon + 1} copies)")
 
 @register(("set", "priority_superimposition"))
@@ -423,7 +422,7 @@ def handle_set_priority_superimposition(state, command):
     superimposition = payload.get("superimposition")
     update_priority_field(state, name, "target_superimposition", superimposition)
     save_state(state)
-    write_log("SET_PRIORITY_SUPERIMPOSITION", {"name": name, "superimposition": superimposition})
+    trace(state, "INFO", "HANDLER", f"SET_PRIORITY_SUPERIMPOSITION {{'name': '{name}', 'superimposition': {superimposition}}}")
     print(f"[OK] {name} target Superimposition -> S{superimposition}  ({superimposition} copies)")
 
 @register(("set", "priority_char_result"))
@@ -440,7 +439,7 @@ def handle_set_char_result(state, command):
 
     record_char_result(state, result, spent, lost_to, name)
     save_state(state)
-    write_log("SET_PRIORITY_CHAR_RESULT", payload)
+    trace(state, "INFO", "HANDLER", f"SET_PRIORITY_CHAR_RESULT {payload}")
     spent_str = f"  spent: {spent} SP" if spent else ""
     lost_str  = f"  lost to: {lost_to}" if lost_to else ""
     print(f"[OK] {name} char: {result}{spent_str}{lost_str}")
@@ -459,7 +458,7 @@ def handle_set_lc_result(state, command):
 
     record_lc_result(state, result, spent, lost_to, name)
     save_state(state)
-    write_log("SET_PRIORITY_LC_RESULT", payload)
+    trace(state, "INFO", "HANDLER", f"SET_PRIORITY_LC_RESULT {payload}")
     spent_str = f"  spent: {spent} SP" if spent else ""
     lost_str  = f"  lost to: {lost_to}" if lost_to else ""
     print(f"[OK] {name} LC: {result}{spent_str}{lost_str}")

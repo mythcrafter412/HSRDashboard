@@ -3,7 +3,7 @@ from engine.debug import trace
 
 def validate(command, state):
 
-    trace(state, "VALIDATOR", f"input: {command}")
+    trace(state, "TRACE", "VALIDATOR", f"input: {command}")
 
     if not command:
         return False, "Empty command"
@@ -16,10 +16,8 @@ def validate(command, state):
         return True, "OK"
 
     if action == "debug":
-        if payload.get("target") not in ["file", "terminal"]:
-            return False, "Use 'debug file enable/disable' or 'debug terminal enable/disable'"
         if payload.get("enabled") not in [True, False]:
-            return False, "Use enable or disable"
+            return False, "Use 'debug terminal enable' or 'debug terminal disable'"
         return True, "OK"
 
     if action == "open":

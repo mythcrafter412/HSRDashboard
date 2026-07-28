@@ -68,8 +68,11 @@
   e.g.  priority lc set Nihilux result lost 60 Firefly
 
 // Debug
-  debug file enable|disable      write trace to data/debug.log  (default: on)
-  debug terminal enable|disable  show trace in terminal          (default: off)
+  debug terminal enable|disable  show trace lines live in terminal  (default: off)
+        logs/latest.log (INFO+) and logs/debug.log (everything) are always
+        written each session regardless of this -- it only controls whether
+        trace lines ALSO print live to the console as they happen
+        prior session's logs are gzip-archived into logs/archive/ on launch
 
 // Other
   help / commands

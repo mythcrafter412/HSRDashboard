@@ -69,7 +69,7 @@ def set_claimable(state, command):
     value = command.get("value")
 
     if name is None:
-        trace(state, "CLAIMABLES", f"set_claimable: '{command['name']}' not found")
+        trace(state, "WARN", "CLAIMABLES", f"set_claimable: '{command['name']}' not found")
         return state, f"Claimable '{command['name']}' not found (tried name and abbreviation)"
 
     entry = state["claimables"][name]
@@ -107,15 +107,15 @@ def remove_claimable(state, command):
     name = resolve_name(state, raw)
 
     if name is None:
-        trace(state, "CLAIMABLES", f"not found: {raw}")
+        trace(state, "WARN", "CLAIMABLES", f"not found: {raw}")
         return state, f"'{raw}' not found (tried name and abbreviation)"
 
     if state["claimables"][name].get("permanent"):
-        trace(state, "CLAIMABLES", f"refused remove of permanent: {name}")
+        trace(state, "WARN", "CLAIMABLES", f"refused remove of permanent: {name}")
         return state, f"'{name}' is permanent -- use 'set claimable {name} sj 0' to zero it out"
 
     del state["claimables"][name]
-    trace(state, "CLAIMABLES", f"removed {name}")
+    trace(state, "INFO", "CLAIMABLES", f"removed {name}")
     return state, "OK"
 
 
