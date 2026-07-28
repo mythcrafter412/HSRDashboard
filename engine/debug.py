@@ -1,6 +1,8 @@
+import ctypes
 import gzip
 import os
 import shutil
+import sys
 from datetime import datetime
 
 from core.utils import get_data_dir
@@ -20,19 +22,25 @@ DEBUG_THRESHOLD  = LEVELS["TRACE"]
 _rotated_this_session = False
 
 
-def _gzip_and_remove(src_path, dst_path):
+def _gzip_copy(src_path, dst_path):
+    # A copy, not a move -- the live log stays in place and readable right
+    # after the app closes. It's only cleared the NEXT time the app starts.
     with open(src_path, "rb") as src, gzip.open(dst_path, "wb") as dst:
         shutil.copyfileobj(src, dst)
-    os.remove(src_path)
 
 
-def _archive_previous_session():
+def archive_current_session_logs():
     """
-    Minecraft-style rotation: latest.log/debug.log are always overwritten
-    fresh each session, never appended to forever. If either exists from a
-    prior session, gzip it into logs/archive/ under a shared dated,
-    incrementing name (paired so a session's latest+debug archives line up),
-    then remove the originals so this session starts clean.
+    Archives THIS session's latest.log/debug.log into logs/archive/ as
+    paired, dated, incrementing gzip files -- without touching the live
+    files, so they're still there to read immediately after the app closes.
+    Meant to be called right as the app is closing, from both the normal
+    exit path (main.py's finally block) and register_close_handler below
+    (for the console window being closed directly, which raises no
+    catchable Python exception at all).
+
+    Safe to call more than once, but isn't expected to be in normal use --
+    only one of the two hooks above fires for any given close.
     """
     if not (os.path.exists(LATEST_FILE) or os.path.exists(DEBUG_FILE)):
         return
@@ -48,11 +56,65 @@ def _archive_previous_session():
             n += 1
 
         if os.path.exists(LATEST_FILE):
-            _gzip_and_remove(LATEST_FILE, os.path.join(ARCHIVE_DIR, f"{date_str}_{n}.log.gz"))
+            _gzip_copy(LATEST_FILE, os.path.join(ARCHIVE_DIR, f"{date_str}_{n}.log.gz"))
         if os.path.exists(DEBUG_FILE):
-            _gzip_and_remove(DEBUG_FILE, os.path.join(ARCHIVE_DIR, f"{date_str}_{n}-debug.log.gz"))
+            _gzip_copy(DEBUG_FILE, os.path.join(ARCHIVE_DIR, f"{date_str}_{n}-debug.log.gz"))
     except Exception as e:
-        print(f"[LOG] Couldn't archive previous session's logs: {e}")
+        print(f"[LOG] Couldn't archive session logs: {e}")
+
+
+def _clear_stale_session_logs():
+    """
+    Runs once, lazily, on this session's first trace() call. Any
+    latest.log/debug.log present at this point belong to the PREVIOUS
+    session -- already archived when that one closed (see
+    archive_current_session_logs) -- so it's safe to just clear them here
+    to start this session fresh. If the previous session never closed
+    cleanly (crash, killed via Task Manager), these were never archived and
+    get overwritten unarchived -- an accepted gap, not worth a heavier
+    fix for a personal single-user app's debug logs.
+    """
+    for path in (LATEST_FILE, DEBUG_FILE):
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except Exception as e:
+                print(f"[LOG] Couldn't clear {path}: {e}")
+
+
+_console_handler_ref = None  # must outlive the call to SetConsoleCtrlHandler, or ctypes GCs the callback
+
+
+def register_close_handler():
+    """
+    Catches the console window being closed directly (the X button), user
+    logoff, or system shutdown, and archives this session's logs before the
+    process is terminated -- none of these raise a catchable Python
+    exception the way Ctrl+C (KeyboardInterrupt) does, so this is the only
+    hook available for them. Windows gives a several-second grace period
+    for this handler to run before force-terminating the process regardless.
+    ctypes only -- stdlib, no extra dependency, same pattern as updater.py's
+    single-instance mutex. No-op on non-Windows.
+    """
+    global _console_handler_ref
+    if sys.platform != "win32":
+        return
+
+    CTRL_CLOSE_EVENT    = 2
+    CTRL_LOGOFF_EVENT    = 5
+    CTRL_SHUTDOWN_EVENT = 6
+
+    def handler(ctrl_type):
+        if ctrl_type in (CTRL_CLOSE_EVENT, CTRL_LOGOFF_EVENT, CTRL_SHUTDOWN_EVENT):
+            archive_current_session_logs()
+        return False  # don't suppress Windows' own handling, just log first
+
+    try:
+        handler_type = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_uint)
+        _console_handler_ref = handler_type(handler)
+        ctypes.windll.kernel32.SetConsoleCtrlHandler(_console_handler_ref, True)
+    except Exception:
+        pass
 
 
 def trace(state, level, layer, message):
@@ -64,7 +126,7 @@ def trace(state, level, layer, message):
     """
     global _rotated_this_session
     if not _rotated_this_session:
-        _archive_previous_session()
+        _clear_stale_session_logs()
         _rotated_this_session = True
 
     level_num = LEVELS.get(level.upper(), LEVELS["INFO"])
