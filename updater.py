@@ -1,3 +1,4 @@
+import ctypes
 import importlib.util
 import json
 import os
@@ -7,6 +8,7 @@ import tempfile
 import urllib.error
 import urllib.request
 import zipfile
+from ctypes import wintypes
 
 REPO       = "mythcrafter412/HSRDashboard"
 API_RELEASES = f"https://api.github.com/repos/{REPO}/releases"
@@ -80,6 +82,40 @@ def get_local_version():
         return None
     with open(version_file, "r") as f:
         return f.read().strip()
+
+
+def _parse_version(v):
+    """
+    "0.2.1" -> (0, 2, 1), for numeric comparison rather than string equality
+    -- a plain string check can't tell "ahead of the latest release" apart
+    from "behind it", which matters for picking the right message/menu.
+    Non-numeric parts fall back to 0 rather than raising, since a malformed
+    VERSION file shouldn't crash the updater.
+    """
+    parts = []
+    for part in v.split("."):
+        try:
+            parts.append(int(part))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
+
+
+def _compare_versions(a, b):
+    """
+    -1/0/1 for a<b, a==b, a>b. Pads the shorter tuple with zeros first --
+    without this, plain tuple comparison treats (0, 2) as LESS than
+    (0, 2, 0) (a shorter prefix loses), which would wrongly call "0.2" and
+    "0.2.0" different versions instead of equal.
+    """
+    length   = max(len(a), len(b))
+    a_padded = a + (0,) * (length - len(a))
+    b_padded = b + (0,) * (length - len(b))
+    if a_padded < b_padded:
+        return -1
+    if a_padded > b_padded:
+        return 1
+    return 0
 
 
 def fetch_latest_release():
@@ -194,6 +230,13 @@ def _wait_for_enter(message):
 
 
 def _prompt(options):
+    """
+    Fallback typed-choice prompt (type a number, press Enter) -- used when
+    raw keystroke reading isn't available: non-Windows, or stdin isn't a
+    real attached console (piped/redirected input, as in every automated
+    test of this file -- ReadConsoleInputW needs an actual console input
+    handle and can't read from a pipe).
+    """
     print()
     for key, label in options.items():
         print(f"  [{key}] {label}")
@@ -201,6 +244,105 @@ def _prompt(options):
         return input("> ").strip()
     except EOFError:
         return ""
+
+
+class _KEY_EVENT_RECORD(ctypes.Structure):
+    _fields_ = [
+        ("bKeyDown",         wintypes.BOOL),
+        ("wRepeatCount",     wintypes.WORD),
+        ("wVirtualKeyCode",  wintypes.WORD),
+        ("wVirtualScanCode", wintypes.WORD),
+        ("uChar",            wintypes.WCHAR),
+        ("dwControlKeyState", wintypes.DWORD),
+    ]
+
+
+class _INPUT_RECORD_EVENT(ctypes.Union):
+    _fields_ = [("KeyEvent", _KEY_EVENT_RECORD), ("_padding", ctypes.c_byte * 16)]
+
+
+class _INPUT_RECORD(ctypes.Structure):
+    _fields_ = [("EventType", wintypes.WORD), ("Event", _INPUT_RECORD_EVENT)]
+
+
+_STD_INPUT_HANDLE = -10
+_KEY_EVENT        = 0x0001
+_VK_RETURN        = 0x0D
+_VK_BACK          = 0x08
+_CTRL_PRESSED     = 0x0002 | 0x0004  # LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED
+
+
+def _read_single_keypress():
+    """
+    Reads raw console key-down events via ReadConsoleInputW (ctypes --
+    stdlib, no dependency) until Enter, Ctrl+Enter, or Backspace is seen;
+    returns "enter", "ctrl_enter", or "backspace". Plain msvcrt.getch()
+    can't distinguish Ctrl+Enter from plain Enter -- holding Ctrl doesn't
+    change the character code CR already has -- so this reads the actual
+    KEY_EVENT_RECORD and checks dwControlKeyState directly instead.
+
+    Returns None if this can't be done at all (non-Windows, no real
+    console attached, or the API call fails) so the caller can fall back
+    to the typed-choice _prompt() instead.
+    """
+    if sys.platform != "win32":
+        return None
+
+    try:
+        h_input = ctypes.windll.kernel32.GetStdHandle(_STD_INPUT_HANDLE)
+        if not h_input or h_input == -1:
+            return None
+
+        record      = _INPUT_RECORD()
+        events_read = wintypes.DWORD()
+
+        while True:
+            ok = ctypes.windll.kernel32.ReadConsoleInputW(
+                h_input, ctypes.byref(record), 1, ctypes.byref(events_read)
+            )
+            if not ok or events_read.value == 0:
+                return None
+
+            if record.EventType != _KEY_EVENT:
+                continue
+
+            key = record.Event.KeyEvent
+            if not key.bKeyDown:
+                continue  # ignore key-release events
+
+            if key.wVirtualKeyCode == _VK_RETURN:
+                return "ctrl_enter" if (key.dwControlKeyState & _CTRL_PRESSED) else "enter"
+            if key.wVirtualKeyCode == _VK_BACK:
+                return "backspace"
+            # anything else: ignore, keep waiting
+    except Exception:
+        return None
+
+
+def _prompt_continue_or_exit():
+    print("  [ENTER] Continue   [BACKSPACE] Exit")
+    key = _read_single_keypress()
+    if key == "backspace":
+        return "exit"
+    if key is not None:
+        return "continue"  # enter or ctrl_enter both just mean "go"
+    choice = _prompt({"1": "Continue", "2": "Exit"})
+    return "exit" if choice == "2" else "continue"
+
+
+def _prompt_update_menu():
+    print("  [CTRL+ENTER] Update   [ENTER] Continue anyway   [BACKSPACE] Exit")
+    key = _read_single_keypress()
+    if key == "ctrl_enter":
+        return "update"
+    if key == "backspace":
+        return "exit"
+    if key == "enter":
+        return "continue"
+    if key is None:
+        choice = _prompt({"1": "Update", "2": "Continue anyway", "3": "Exit"})
+        return {"1": "update", "2": "continue"}.get(choice, "exit")
+    return "exit"
 
 
 def main():
@@ -242,22 +384,34 @@ def main():
         run_app()
         return
 
-    if release is None or release["version"] == local_version:
+    local_tuple  = _parse_version(local_version)
+    remote_tuple = _parse_version(release["version"]) if release else None
+    comparison   = _compare_versions(remote_tuple, local_tuple) if release else 0
+
+    if release is None or comparison == 0:
         print(f"Up to date (v{local_version})")
-        choice = _prompt({"1": "Continue", "2": "Exit"})
-        if choice == "1":
+        if _prompt_continue_or_exit() == "continue":
+            run_app()
+        return
+
+    if comparison < 0:
+        # Local is AHEAD of the latest published release -- not an update
+        # to offer, just a heads-up that this isn't a normal released build.
+        print("You are using a beta (unreleased) or modified version of this app,")
+        print("this may include bugs and unfinished mechanics.")
+        if _prompt_continue_or_exit() == "continue":
             run_app()
         return
 
     channel = "PRE-RELEASE" if release["prerelease"] else "RELEASE"
     print(f"Update available [{channel}]: v{local_version} -> v{release['version']}")
-    choice = _prompt({"1": "Update", "2": "Continue anyway", "3": "Exit"})
+    choice = _prompt_update_menu()
 
-    if choice == "1":
+    if choice == "update":
         print(f"Downloading v{release['version']}...")
         download_and_install(release["zip_url"])
         run_app()
-    elif choice == "2":
+    elif choice == "continue":
         run_app()
     # else: exit
 
